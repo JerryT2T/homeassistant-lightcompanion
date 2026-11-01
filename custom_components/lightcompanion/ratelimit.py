@@ -51,15 +51,18 @@ class RateLimiter:
         """Return the profile for a transport (unknown names -> generic)."""
         return TRANSPORTS.get(transport) or TRANSPORTS[DEFAULT_TRANSPORT]
 
-    async def acquire(self, transport: str) -> bool:
-        """Wait for a slot; False means the caller must drop this frame."""
+    async def acquire(self, transport: str, *, max_wait: float | None = None) -> bool:
+        """Wait for a slot; False means the caller must drop this frame.
+
+        ``max_wait`` overrides the default frame budget (e.g. one frame interval).
+        """
         profile = self.profile(transport)
         interval = 1.0 / profile.max_per_s
         key = profile.name
         now = time.monotonic()
         slot = max(now, self._global_next, self._next.get(key, 0.0))
         wait = slot - now
-        if wait > self._max_wait:
+        if wait > (self._max_wait if max_wait is None else max_wait):
             return False
         # Reserve before sleeping so concurrent callers serialise.
         self._global_next = slot + self._global_interval

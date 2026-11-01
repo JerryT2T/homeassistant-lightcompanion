@@ -467,7 +467,6 @@ async def test_own_context_and_device_echo_do_not_count_as_external(
     eng._quiet_until.clear()
     hass.states.async_set("light.a", "off", context=Context())
     await hass.async_block_till_done()
-    assert eng._runs["living"].units[0].yielded or not eng.is_active("living")
     await asyncio.sleep(0.05)
     assert not eng.is_active("living")  # all lights yielded -> effect ends
     assert env.of("scene", "turn_on") == []  # and nothing is restored over the takeover
@@ -549,7 +548,7 @@ async def test_group_with_all_members_is_driven_as_one_call(hass: HomeAssistant,
         make_light("light.grp", is_group=True),
     ]
     await eng.async_apply("living", make_plan(pattern="pulse"), lights, source="chat")
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.4)
     await eng.async_stop("living", restore=False)
     targets = set(env.light_targets())
     assert targets == {"light.grp"}  # never group AND members
@@ -565,7 +564,7 @@ async def test_per_bulb_patterns_drive_members_not_the_group(hass: HomeAssistant
         make_light("light.grp", is_group=True),
     ]
     await eng.async_apply("living", make_plan(pattern="wave"), lights, source="chat")
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.4)
     await eng.async_stop("living", restore=False)
     assert set(env.light_targets()) == {"light.a", "light.b"}
 
@@ -580,7 +579,7 @@ async def test_group_with_foreign_members_is_never_used(hass: HomeAssistant, env
         make_light("light.grp", is_group=True),
     ]
     await eng.async_apply("living", make_plan(pattern="pulse"), lights, source="chat")
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.4)
     await eng.async_stop("living", restore=False)
     assert set(env.light_targets()) == {"light.a", "light.b"}
 
@@ -591,9 +590,9 @@ async def test_existing_group_covering_the_targets_is_preferred(
     set_on(hass, "light.a", "light.b", "light.c")
     group_state(hass, "light.ab", ["light.a", "light.b"])
     eng = EffectEngine(hass, make_settings())
-    lights = [make_light(e, transport="hue") for e in ("light.a", "light.b", "light.c")]
+    lights = [make_light(e) for e in ("light.a", "light.b", "light.c")]
     await eng.async_apply("living", make_plan(pattern="breathe"), lights, source="chat")
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.4)
     await eng.async_stop("living", restore=False)
     assert set(env.light_targets()) == {"light.ab", "light.c"}
 

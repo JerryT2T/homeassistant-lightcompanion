@@ -101,12 +101,13 @@ async def test_zigbee2mqtt_device_is_zigbee(hass: HomeAssistant, living: str) ->
     dev = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={("mqtt", "zigbee2mqtt_0xabc")},
-        area_id=living,
     )
+    dr.async_get(hass).async_update_device(dev.id, area_id=living)
     add_light(hass, "z2m", "mqtt", area_id=None, device_id=dev.id, config_entry=entry)
     plain = dr.async_get(hass).async_get_or_create(
-        config_entry_id=entry.entry_id, identifiers={("mqtt", "something")}, area_id=living
+        config_entry_id=entry.entry_id, identifiers={("mqtt", "something")}
     )
+    dr.async_get(hass).async_update_device(plain.id, area_id=living)
     add_light(hass, "plain_mqtt", "mqtt", area_id=None, device_id=plain.id, config_entry=entry)
     infos = {i.entity_id: i for i in async_area_lights(hass, living, make_settings())}
     assert infos["light.z2m"].transport == "zigbee"
@@ -203,8 +204,9 @@ async def test_area_via_device(hass: HomeAssistant, living: str) -> None:
     entry = MockConfigEntry(domain="hue")
     entry.add_to_hass(hass)
     dev = dr.async_get(hass).async_get_or_create(
-        config_entry_id=entry.entry_id, identifiers={("hue", "d1")}, area_id=living
+        config_entry_id=entry.entry_id, identifiers={("hue", "d1")}
     )
+    dr.async_get(hass).async_update_device(dev.id, area_id=living)
     add_light(hass, "viadev", area_id=None, device_id=dev.id, config_entry=entry)
     assert [i.entity_id for i in async_area_lights(hass, living, make_settings())] == [
         "light.viadev"
@@ -222,7 +224,7 @@ async def test_average_color(hass: HomeAssistant) -> None:
 
 async def test_average_color_temp_and_hs(hass: HomeAssistant) -> None:
     hass.states.async_set("light.warm", "on", {"color_temp_kelvin": 2700, "brightness": 200})
-    r, g, b = async_average_color(hass, ["light.warm"])
+    r, _g, b = async_average_color(hass, ["light.warm"])
     assert r > b  # warm white is reddish
     hass.states.async_set("light.hs", "on", {"hs_color": (0, 100), "brightness": 100})
     assert async_average_color(hass, ["light.hs"]) == (255, 0, 0)

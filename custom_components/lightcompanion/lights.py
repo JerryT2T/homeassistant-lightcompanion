@@ -56,7 +56,7 @@ def _restrictiveness(transport: str) -> float:
     return TRANSPORTS.get(transport, TRANSPORTS[DEFAULT_TRANSPORT]).max_per_s
 
 
-def _platform_transport(platform: str, device: dr.DeviceEntry | None = None) -> str | None:
+def _platform_transport(platform: str, device: dr.DeviceEntry | None = None) -> str | None:  # noqa: PLR0911
     """Map an entity-registry platform to a transport class (None = unknown)."""
     if platform == "hue":
         return "hue"
@@ -147,7 +147,7 @@ def _is_excluded(
     )
 
 
-def _build_info(
+def _build_info(  # noqa: PLR0913, PLR0917
     hass: HomeAssistant,
     entry: er.RegistryEntry,
     area_id: str | None,

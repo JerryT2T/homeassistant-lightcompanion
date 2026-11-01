@@ -89,7 +89,7 @@ def _depth(intensity: int) -> float:
     return min(0.9, 0.1 + 0.15 * max(1, min(5, intensity)))
 
 
-def build_frame(
+def build_frame(  # noqa: PLR0911, PLR0913, PLR0917
     pattern: str,
     step: int,
     n_units: int,
@@ -262,7 +262,7 @@ class EffectEngine:
         for cb in list(self._listeners):
             try:
                 cb()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.exception("Engine listener failed")
 
     def _fire(self, event: str, run: _Run, reason: str | None = None) -> None:
@@ -537,7 +537,7 @@ class EffectEngine:
                 blocking=False,
                 context=self._new_context(),
             )
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             _LOGGER.debug("light.%s failed for %s: %s", service, data.get("entity_id"), err)
 
     def _mark_quiet(self, unit: _Unit, transition: float) -> None:
@@ -583,7 +583,11 @@ class EffectEngine:
                     plan.intensity,
                     self._rng,
                 )
-                for unit, cmd in zip(active, cmds, strict=True):
+                pairs = list(zip(active, cmds, strict=True))
+                if pairs:  # rotate so rate-limit drops do not always hit the same light
+                    shift = step % len(pairs)
+                    pairs = pairs[shift:] + pairs[:shift]
+                for unit, cmd in pairs:
                     if time.monotonic() - frame_start > max(interval, 0.5):
                         break  # stale: drop the rest of this frame
                     if unit.yielded or not self._available(unit.entity_id):
@@ -607,10 +611,14 @@ class EffectEngine:
                     key = tuple((k, str(v)) for k, v in sorted(data.items()) if k != "transition")
                     if key == unit.last:
                         continue
-                    if not await self._limiter.acquire(unit.transport):
+                    if not await self._limiter.acquire(
+                        unit.transport, max_wait=min(0.5, max(interval, 0.25))
+                    ):
                         continue  # drop, never queue stale frames
-                    if unit.yielded or run is not self._runs.get(run.area_id):
+                    if run is not self._runs.get(run.area_id):
                         return
+                    if unit.yielded:
+                        continue
                     unit.last = key
                     await self._send(unit, data)
                 step += 1
@@ -651,7 +659,7 @@ class EffectEngine:
                     context=self._new_context(),
                 )
                 run.snapshots[entity_id] = f"scene.{scene_id}"
-            except Exception as err:  # noqa: BLE001
+            except Exception as err:
                 _LOGGER.debug("Snapshot of %s failed: %s", entity_id, err)
 
     def _adaptive_switches(self, entity_ids: set[str]) -> list[tuple[str, list[str]]]:
@@ -677,7 +685,7 @@ class EffectEngine:
                     blocking=True,
                     context=self._new_context(),
                 )
-            except Exception as err:  # noqa: BLE001
+            except Exception as err:
                 _LOGGER.debug("adaptive_lighting manual control failed: %s", err)
 
     async def _take_manual_control(self, run: _Run) -> None:
@@ -712,7 +720,7 @@ class EffectEngine:
                         blocking=True,
                         context=self._new_context(),
                     )
-                except Exception as err:  # noqa: BLE001
+                except Exception as err:
                     _LOGGER.debug("Restore failed: %s", err)
         if self.hass.services.has_service("scene", "delete"):
             scenes = list(run.snapshots.values())
