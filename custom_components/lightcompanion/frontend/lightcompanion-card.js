@@ -299,6 +299,7 @@ const STYLE = `
 *::-webkit-scrollbar-thumb { background: var(--divider-color, #888); border-radius: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
 ha-card { display: flex; flex-direction: column; height: 100%; min-height: 440px; overflow: hidden; position: relative; isolation: isolate; }
+[hidden] { display: none !important; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible, .chip:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 
@@ -321,6 +322,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, .chip:focus-vis
   filter: blur(60px); opacity: .0; transition: background-color 1.2s ease, opacity 1.2s ease; z-index: 0; pointer-events: none; }
 .hero > *:not(.halo) { position: relative; z-index: 1; }
 .chips { display: flex; gap: 8px; overflow-x: auto; width: 100%; padding: 2px 2px 6px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+.chips { scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
 .chips.has-gear { padding-right: 48px; }
 .chip { flex: none; scroll-snap-align: start; border: 1px solid var(--divider-color); background: color-mix(in srgb, var(--card-background-color) 70%, transparent);
   color: var(--primary-text-color); border-radius: 999px; padding: 0 16px; min-height: 44px; font-size: 14px; transition: background .2s, border-color .2s, color .2s; backdrop-filter: blur(6px); }
@@ -334,7 +337,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .chip:focus-vis
   background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.55), rgba(255,255,255,0) 52%), radial-gradient(circle at 70% 80%, rgba(0,0,0,.22), rgba(0,0,0,0) 60%); }
 .orb.running { animation: breathe 4s ease-in-out infinite; }
 @keyframes breathe { 50% { transform: scale(1.045); } }
-.avg { font-size: 12px; color: var(--secondary-text-color); letter-spacing: .04em; display: flex; align-items: center; gap: 6px; min-height: 18px; }
+.avg { font-size: 12px; color: var(--primary-text-color); letter-spacing: .04em; display: flex; align-items: center; gap: 6px; min-height: 18px; }
 .dots { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 100%; min-height: 14px; }
 .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid transparent; transition: background-color 1s ease, box-shadow 1s ease; cursor: default; }
 .dot.off { background: transparent !important; border-color: var(--divider-color); box-shadow: none !important; }
@@ -672,7 +675,7 @@ class LightCompanionCard extends HTMLElement {
       ? `0 0 ${30 + avg.level * 50}px ${6 + avg.level * 14}px color-mix(in srgb, ${col} ${Math.round(35 + avg.level * 35)}%, transparent)`
       : "none";
     this._elHalo.style.backgroundColor = col;
-    this._elHalo.style.opacity = avg.anyOn ? String(0.22 + avg.level * 0.3) : "0.06";
+    this._elHalo.style.opacity = avg.anyOn ? String(0.12 + avg.level * 0.18) : "0.06";
     this._elOrb.setAttribute("aria-label", `${t("avg")} ${avg.anyOn ? hex(avg.rgb) : t("off")}`);
     this._elAvg.replaceChildren(
       h("span", { text: t("avg") }),
