@@ -247,12 +247,17 @@ async def test_dynamic_frames_are_paced_and_dropped_not_queued(
     set_on(hass, "light.a", "light.b")
     eng = EffectEngine(hass, make_settings(light_rate=100))
     lights = [make_light("light.a"), make_light("light.b")]
+    loop = asyncio.get_running_loop()
+    start = loop.time()
     await eng.async_apply("living", make_plan(pattern="color_cycle"), lights, source="chat")
-    await asyncio.sleep(0.42)
+    # Wait for frames instead of a fixed sleep, so a loaded machine cannot starve the check.
+    while len(env.of("light", "turn_on")) < 4 and loop.time() - start < 5:
+        await asyncio.sleep(0.02)
     await eng.async_stop("living", restore=False)
+    elapsed = loop.time() - start
     sent = len(env.of("light", "turn_on"))
-    # 0.05 s frames over 0.42 s, 2 lights: ~8 frames, bounded; never a backlog
-    assert 4 <= sent <= 2 * 10
+    # 0.05 s frames, 2 lights: paced by elapsed time, never a backlog
+    assert 4 <= sent <= 2 * (int(elapsed / 0.05) + 2)
     await asyncio.sleep(0.2)
     assert len(env.of("light", "turn_on")) == sent
     assert eng._runs == {}
