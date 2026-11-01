@@ -246,10 +246,7 @@ class Planner:
         self, task: str, instructions: str, structure: dict[str, Any]
     ) -> dict[str, Any]:
         if self._client is None:
-            try:
-                self._client = create_client(self.hass, self._settings)
-            except LLMError:
-                raise
+            self._client = create_client(self.hass, self._settings)
         return await self._client.async_generate(
             task_name=task, instructions=instructions, schema=structure
         )
@@ -353,7 +350,8 @@ class Planner:
                 follow.error = err.code
                 return
             if profile is None:
-                profile = self._profile_from(raw, bpm, cover)
+                features = getattr(self._music, "audio_features", lambda _t: None)(track)
+                profile = self._profile_from(raw, bpm, cover, features)
                 self._profiles.put(uri, profile)
             self._plan_cache[cache_key] = raw
             while len(self._plan_cache) > PLAN_CACHE_SIZE:
@@ -380,7 +378,10 @@ class Planner:
 
     @staticmethod
     def _profile_from(
-        raw: dict[str, Any], bpm: tuple[float, str] | None, cover: Any
+        raw: dict[str, Any],
+        bpm: tuple[float, str] | None,
+        cover: Any,
+        features: dict[str, float] | None = None,
     ) -> MusicProfile:
         energy = raw.get("music_energy")
         energy_i = (
@@ -388,6 +389,9 @@ class Planner:
             if isinstance(energy, (int, float)) and not isinstance(energy, bool)
             else 3
         )
+        if features and "energy" in features:  # measured beats the LLM estimate
+            parts = [features["energy"], features.get("danceability", features["energy"])]
+            energy_i = max(1, min(5, round(1 + 4 * (0.7 * parts[0] + 0.3 * parts[1]))))
         tempo = raw.get("music_tempo_class")
         return MusicProfile(
             genre=str(raw.get("music_genre") or "")[:60],

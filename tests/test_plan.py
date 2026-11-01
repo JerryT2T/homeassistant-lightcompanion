@@ -138,7 +138,18 @@ def test_palette_limits():
 
 @pytest.mark.parametrize(
     "color",
-    [[256, 0, 0], [-1, 0, 0], [1, 2], [1, 2, 3, 4], "red", [1.5, 0, 0], [True, 0, 0], ["1", 0, 0], None, [float("nan"), 0, 0]],
+    [
+        [256, 0, 0],
+        [-1, 0, 0],
+        [1, 2],
+        [1, 2, 3, 4],
+        "red",
+        [1.5, 0, 0],
+        [True, 0, 0],
+        ["1", 0, 0],
+        None,
+        [float("nan"), 0, 0],
+    ],
 )
 def test_palette_bad_entries(color):
     bad(palette=[color])
@@ -168,12 +179,16 @@ def test_normalize_does_not_rescue_garbage():
         check(normalize_raw_plan(base(palette=["#zzzzzz"])))
 
 
-@pytest.mark.parametrize("pattern", ["static", "breathe", "pulse", "wave", "color_cycle", "sparkle"])
+@pytest.mark.parametrize(
+    "pattern", ["static", "breathe", "pulse", "wave", "color_cycle", "sparkle"]
+)
 def test_patterns(pattern):
     assert check(base(pattern=pattern)).pattern == pattern
 
 
-@pytest.mark.parametrize("field,value", [("pattern", "disco"), ("pattern", 3), ("tempo", "ludicrous"), ("tempo", 1)])
+@pytest.mark.parametrize(
+    "field,value", [("pattern", "disco"), ("pattern", 3), ("tempo", "ludicrous"), ("tempo", 1)]
+)
 def test_enum_violations(field, value):
     bad(**{field: value})
 

@@ -48,7 +48,11 @@ def install() -> None:
 
     _mod("homeassistant")
     _mod("homeassistant.core", callback=lambda f: f, HomeAssistant=object, CALLBACK_TYPE=object)
-    _mod("homeassistant.exceptions", HomeAssistantError=HomeAssistantError, ServiceNotFound=ServiceNotFound)
+    _mod(
+        "homeassistant.exceptions",
+        HomeAssistantError=HomeAssistantError,
+        ServiceNotFound=ServiceNotFound,
+    )
     _mod("homeassistant.helpers")
     _mod("homeassistant.helpers.aiohttp_client", async_get_clientsession=lambda hass: hass.session)
     pkg_root = types.ModuleType("custom_components")
@@ -60,7 +64,11 @@ def install() -> None:
     _mod(
         f"{PKG}.const",
         DOMAIN="lightcompanion",
-        DEFAULT_MODELS={"openai": "gpt-5-mini", "anthropic": "claude-haiku-4-5", "google": "gemini-2.5-flash"},
+        DEFAULT_MODELS={
+            "openai": "gpt-5-mini",
+            "anthropic": "claude-haiku-4-5",
+            "google": "gemini-2.5-flash",
+        },
     )
 
     class EffectBlockedError(Exception):

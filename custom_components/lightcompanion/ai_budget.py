@@ -12,9 +12,7 @@ WINDOW_S = 3600.0
 class AiBudget:
     """Allows ``calls_per_hour`` spends within any rolling 60 minutes."""
 
-    def __init__(
-        self, calls_per_hour: int, *, clock: Callable[[], float] = time.monotonic
-    ) -> None:
+    def __init__(self, calls_per_hour: int, *, clock: Callable[[], float] = time.monotonic) -> None:
         self._limit = max(0, int(calls_per_hour))
         self._clock = clock
         self._spent: deque[float] = deque()

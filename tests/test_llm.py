@@ -50,7 +50,7 @@ def test_extract_json_nested():
     assert base.extract_json('x {"a": {"b": [1, 2]}} y') == {"a": {"b": [1, 2]}}
 
 
-@pytest.mark.parametrize("text", ["no json here", "[1, 2]", '{"a": ', '{not json}'])
+@pytest.mark.parametrize("text", ["no json here", "[1, 2]", '{"a": ', "{not json}"])
 def test_extract_json_invalid(text):
     with pytest.raises(LLMError) as exc:
         base.extract_json(text)
@@ -74,7 +74,9 @@ def test_json_schema_conversion():
     assert props["native_effects"]["type"] == "object"
     assert "music_energy" in props
     assert set(schema["required"]) == {"reply", "action"}
-    assert "music_energy" not in base.structure_to_json_schema(prompt.plan_structure())["properties"]
+    assert (
+        "music_energy" not in base.structure_to_json_schema(prompt.plan_structure())["properties"]
+    )
 
 
 # --- ai_task / conversation -----------------------------------------------------------------
@@ -137,13 +139,21 @@ def test_conversation_extracts_json():
 
 @pytest.mark.parametrize(
     "response,code",
-    [(None, "no_answer"), ({"response": {}}, "no_answer"), (conv_response("sorry, no"), "invalid_json")],
+    [
+        (None, "no_answer"),
+        ({"response": {}}, "no_answer"),
+        (conv_response("sorry, no"), "invalid_json"),
+    ],
 )
 def test_conversation_bad_answers(response, code):
     hass = FakeHass()
     hass.services = FakeServices(response)
     with pytest.raises(LLMError) as exc:
-        run(conversation.ConversationClient(hass).async_generate(task_name="t", instructions="i", schema={}))
+        run(
+            conversation.ConversationClient(hass).async_generate(
+                task_name="t", instructions="i", schema={}
+            )
+        )
     assert exc.value.code == code
 
 
@@ -151,7 +161,11 @@ def test_conversation_service_error():
     hass = FakeHass()
     hass.services = FakeServices(error=HomeAssistantError("x"))
     with pytest.raises(LLMError) as exc:
-        run(conversation.ConversationClient(hass).async_generate(task_name="t", instructions="i", schema={}))
+        run(
+            conversation.ConversationClient(hass).async_generate(
+                task_name="t", instructions="i", schema={}
+            )
+        )
     assert exc.value.code == "request_failed"
 
 
@@ -193,7 +207,11 @@ def http_client(provider, resp=None, error=None, key="sk-secret", model=None):
 
 
 def gen(client):
-    return run(client.async_generate(task_name="t", instructions="user text", schema=prompt.plan_structure()))
+    return run(
+        client.async_generate(
+            task_name="t", instructions="user text", schema=prompt.plan_structure()
+        )
+    )
 
 
 OPENAI_OK = {"choices": [{"message": {"content": '{"action":"none"}'}}]}
@@ -308,7 +326,15 @@ class Stub:
         return self.result
 
 
-@pytest.mark.parametrize("code,falls_back", [("not_configured", True), ("request_failed", True), ("timeout", False), ("invalid_json", False)])
+@pytest.mark.parametrize(
+    "code,falls_back",
+    [
+        ("not_configured", True),
+        ("request_failed", True),
+        ("timeout", False),
+        ("invalid_json", False),
+    ],
+)
 def test_fallback_client(code, falls_back):
     primary, fallback = Stub(error=LLMError(code)), Stub({"ok": 1})
     client = factory.FallbackClient(primary, fallback)
@@ -326,7 +352,9 @@ def test_fallback_client(code, falls_back):
 
 def test_prompt_contains_only_non_excluded_lights_with_capabilities():
     lights = [
-        FakeLight("light.sofa", name="Sofa", effect_list=("Rainbow",), min_kelvin=2200, max_kelvin=6500),
+        FakeLight(
+            "light.sofa", name="Sofa", effect_list=("Rainbow",), min_kelvin=2200, max_kelvin=6500
+        ),
         FakeLight("light.fish", name="Aquarium", excluded=True),
         FakeLight("light.plug", name="Plug", supports_color=False, color_modes=("onoff",)),
     ]
@@ -353,4 +381,6 @@ def test_prompt_sanitizes_names_and_user_text():
 def test_prompt_strobe_setting_is_stated():
     kw = {"area_name": "A", "lights": [], "text": "t", "language": None}
     assert "owner: no" in prompt.build_chat_instructions(settings=make_settings(), **kw)
-    assert "owner: yes" in prompt.build_chat_instructions(settings=make_settings(allow_strobe=True), **kw)
+    assert "owner: yes" in prompt.build_chat_instructions(
+        settings=make_settings(allow_strobe=True), **kw
+    )

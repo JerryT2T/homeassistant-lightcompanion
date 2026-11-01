@@ -5,6 +5,7 @@ Nothing the LLM says reaches a light service unless ``validate_plan`` accepts it
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -114,10 +115,8 @@ def normalize_raw_plan(raw: Any) -> Any:
     for key in ("palette", "targets", "native_effects"):
         value = out.get(key)
         if isinstance(value, str):
-            try:
+            with contextlib.suppress(ValueError):
                 out[key] = json.loads(value)
-            except ValueError:
-                pass
     palette = out.get("palette")
     if isinstance(palette, list):
         converted: list[Any] = []

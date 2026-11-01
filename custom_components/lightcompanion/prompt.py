@@ -70,9 +70,7 @@ def plan_structure(*, with_profile: bool = False) -> dict[str, Any]:
         "targets": text(
             "Entity ids from the light list; empty = all lights of the room.", multiple=True
         ),
-        "palette": text(
-            f"1 to {MAX_PALETTE} colors as #rrggbb hex strings.", multiple=True
-        ),
+        "palette": text(f"1 to {MAX_PALETTE} colors as #rrggbb hex strings.", multiple=True),
         "color_temp_kelvin": number("White scenes only: color temperature.", 1000, 10000, 50),
         "brightness_pct": number("Brightness 1..100.", 1, 100),
         "pattern": select("Light pattern.", PATTERNS),
@@ -168,7 +166,7 @@ def _profile_block(
     if bpm is not None:
         parts.append(f"Measured BPM: {bpm[0]:.0f} (source {bpm[1]}). Use it for tempo.")
     if cover_palette:
-        hexes = ", ".join("#%02x%02x%02x" % tuple(c) for c in cover_palette)
+        hexes = ", ".join("#{:02x}{:02x}{:02x}".format(*tuple(c)) for c in cover_palette)
         parts.append(f"Album cover colors: {hexes}.")
     return "\n".join(parts)
 
@@ -187,7 +185,8 @@ def build_chat_instructions(
     parts = [
         SYSTEM_RULES,
         f"Room: {clean(area_name)}",
-        "Strobe allowed by owner: " + ("yes (only with party=true)" if settings.allow_strobe else "no"),
+        "Strobe allowed by owner: "
+        + ("yes (only with party=true)" if settings.allow_strobe else "no"),
         "Lights (one JSON per line):\n" + describe_lights(lights),
     ]
     if language:
@@ -201,7 +200,9 @@ def build_chat_instructions(
         )
     block = _track_block(track)
     if block:
-        parts.append("Now playing in this room (follow_music=true makes lights follow it):\n" + block)
+        parts.append(
+            "Now playing in this room (follow_music=true makes lights follow it):\n" + block
+        )
     parts.append(f"<user_request>{clean(text, MAX_USER_TEXT)}</user_request>")
     return "\n\n".join(parts)
 
@@ -223,11 +224,12 @@ def build_music_instructions(
     """Instructions for re-planning on a new track (combines the user's last wish)."""
     parts = [
         SYSTEM_RULES,
-        "A new track started. Re-plan the lights for it: action must be \"apply\" and "
+        'A new track started. Re-plan the lights for it: action must be "apply" and '
         "follow_music true. Keep the user's last wish (e.g. color restrictions) in force; "
         "the music only decides rhythm, energy and mood within it.",
         f"Room: {clean(area_name)}",
-        "Strobe allowed by owner: " + ("yes (only with party=true)" if settings.allow_strobe else "no"),
+        "Strobe allowed by owner: "
+        + ("yes (only with party=true)" if settings.allow_strobe else "no"),
         "Lights (one JSON per line):\n" + describe_lights(lights),
         _track_block(track),
     ]
@@ -246,5 +248,7 @@ def build_music_instructions(
         )
     if language:
         parts.append(f"User language: {clean(language, 10)}")
-    parts.append(f"<user_request>{clean(last_text or 'Follow the music.', MAX_USER_TEXT)}</user_request>")
+    parts.append(
+        f"<user_request>{clean(last_text or 'Follow the music.', MAX_USER_TEXT)}</user_request>"
+    )
     return "\n\n".join(p for p in parts if p)

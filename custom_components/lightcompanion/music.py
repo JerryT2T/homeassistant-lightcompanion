@@ -32,6 +32,13 @@ BPM_MIN, BPM_MAX = 40.0, 250.0
 ENVELOPE_POINTS = 256
 DEEZER_SEARCH = "https://api.deezer.com/search"
 DEEZER_TRACK = "https://api.deezer.com/track/{id}"
+DEEZER_ISRC = "https://api.deezer.com/track/isrc:{isrc}"
+RECCOBEATS_URL = "https://api.reccobeats.com/v1/audio-features"
+BACKOFF_S = 3600.0
+NEGATIVE_TTL_S = 600.0
+BPM_CACHE_SIZE = 500
+REPOLL_INTERVAL_S = 10
+REPOLL_ATTEMPTS = 3
 
 Color = tuple[int, int, int]
 
@@ -149,7 +156,9 @@ def pick_palette(counted: list[tuple[int, Color]], limit: int = 5) -> tuple[Colo
         for color in pool:
             if len(chosen) >= limit:
                 break
-            if all(sum((a - b) ** 2 for a, b in zip(color, o, strict=True)) > 50**2 for o in chosen):
+            if all(
+                sum((a - b) ** 2 for a, b in zip(color, o, strict=True)) > 50**2 for o in chosen
+            ):
                 chosen.append(color)
     return tuple(chosen[:limit])
 
@@ -168,9 +177,7 @@ def dominant_colors(data: bytes, limit: int = 5) -> tuple[Color, ...]:
             quant = img.quantize(colors=10)
             palette = quant.getpalette() or []
             counts = quant.getcolors() or []
-        counted = [
-            (n, (palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2])) for n, i in counts
-        ]
+        counted = [(n, (palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2])) for n, i in counts]
         return pick_palette(counted, limit)
     except Exception:  # noqa: BLE001 - broken image must never break a chat
         _LOGGER.debug("Cover image could not be decoded", exc_info=True)
@@ -255,38 +262,104 @@ def bpm_source_names() -> list[str]:
     return [name for name, _ in _BPM_SOURCES]
 
 
+def _isrc_from(raw: Any) -> str | None:
+    """ISRC out of MA ``external_ids``: list of ``[type, value]`` pairs."""
+    ids = raw.get("external_ids") if isinstance(raw, dict) else None
+    for pair in ids or []:
+        if isinstance(pair, (list, tuple)) and len(pair) == 2 and str(pair[0]).lower() == "isrc":  # noqa: PLR2004
+            value = str(pair[1]).strip().upper()
+            if value:
+                return value
+    return None
+
+
+def _bpm_from_raw(raw: Any) -> float | None:
+    """``raw["audio_metadata"]["bpm"]`` (raw dict, independent of the models version)."""
+    meta = raw.get("audio_metadata") if isinstance(raw, dict) else None
+    found = valid_bpm(meta.get("bpm")) if isinstance(meta, dict) else None
+    return found or (_find_bpm(raw) if isinstance(raw, dict) else None)
+
+
 async def _ma_bpm(service: MusicService, track: TrackInfo) -> float | None:
+    """Music Assistant analyses played tracks; bpm may be empty on first play."""
     state = service.hass.states.get(track.player_entity_id)
     if state is not None:
         found = _find_bpm(dict(state.attributes))
         if found:
             return found
-    uri = track.uri
-    if not uri:
+    raw = await service.async_ma_track(track)
+    if raw is None:
         return None
-    result = await service.async_ma_command("music/item_by_uri", uri=uri)
-    return _find_bpm(result) if isinstance(result, dict) else None
+    isrc = _isrc_from(raw)
+    if isrc and track.uri:
+        service.isrc_cache[track.uri] = isrc
+    found = _bpm_from_raw(raw)
+    if found is None:
+        service.schedule_ma_repoll(track)
+    return found
 
 
-async def _deezer_bpm(service: MusicService, track: TrackInfo) -> float | None:
-    if not track.title or not track.artist:
+async def _reccobeats_bpm(service: MusicService, track: TrackInfo) -> float | None:
+    isrc = service.isrc_cache.get(track.uri or "")
+    if not isrc or time.monotonic() < service.reccobeats_blocked_until:
         return None
+    import aiohttp  # noqa: PLC0415
     from homeassistant.helpers.aiohttp_client import async_get_clientsession  # noqa: PLC0415
 
     session = async_get_clientsession(service.hass)
+    try:
+        async with session.get(
+            RECCOBEATS_URL,
+            params={"ids": isrc},
+            timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT_S),
+        ) as resp:
+            if resp.status != 200:  # noqa: PLR2004
+                service.reccobeats_blocked_until = time.monotonic() + BACKOFF_S
+                return None
+            body = await resp.json(content_type=None)
+    except Exception:
+        service.reccobeats_blocked_until = time.monotonic() + BACKOFF_S
+        raise
+    content = body.get("content") if isinstance(body, dict) else body
+    item = content[0] if isinstance(content, list) and content else content
+    if not isinstance(item, dict):
+        return None
+    features = {
+        key: float(item[key])
+        for key in ("energy", "danceability")
+        if _float(item.get(key)) is not None and 0 <= item[key] <= 1
+    }
+    if features:
+        service.features[track.uri or ""] = features
+    return valid_bpm(item.get("tempo"))
+
+
+async def _deezer_bpm(service: MusicService, track: TrackInfo) -> float | None:
+    import aiohttp  # noqa: PLC0415
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession  # noqa: PLC0415
+
+    session = async_get_clientsession(service.hass)
+    timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT_S)
+    isrc = service.isrc_cache.get(track.uri or "")
+    if isrc:
+        async with session.get(DEEZER_ISRC.format(isrc=isrc), timeout=timeout) as resp:
+            if resp.status == 200:  # noqa: PLR2004
+                detail = await resp.json(content_type=None)
+                found = valid_bpm((detail or {}).get("bpm"))
+                if found:
+                    return found
+    if not track.title or not track.artist:
+        return None
     query = 'artist:"{}" track:"{}"'.format(
         track.artist.replace('"', " "), track.title.replace('"', " ")
     )
-    import aiohttp  # noqa: PLC0415
-
-    timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT_S)
     async with session.get(DEEZER_SEARCH, params={"q": query, "limit": 3}, timeout=timeout) as resp:
         if resp.status != 200:  # noqa: PLR2004
             return None
-        found = await resp.json(content_type=None)
+        found_items = await resp.json(content_type=None)
     wanted = _norm(track.title)
     track_id = None
-    for item in (found or {}).get("data", []) or []:
+    for item in (found_items or {}).get("data", []) or []:
         title = _norm(str(item.get("title", "")))
         if title and (wanted in title or title in wanted):
             track_id = item.get("id")
@@ -300,7 +373,9 @@ async def _deezer_bpm(service: MusicService, track: TrackInfo) -> float | None:
     return valid_bpm((detail or {}).get("bpm"))
 
 
+# Order matters: measured by Music Assistant first, then ISRC based public APIs.
 register_bpm_source("music_assistant", _ma_bpm)
+register_bpm_source("reccobeats", _reccobeats_bpm)
 register_bpm_source("deezer", _deezer_bpm)
 
 
@@ -315,6 +390,12 @@ class MusicService:
     def __init__(self, hass: HomeAssistant, settings: Settings) -> None:
         self.hass = hass
         self._settings = settings
+        self.isrc_cache: dict[str, str] = {}
+        self.features: dict[str, dict[str, float]] = {}
+        self.reccobeats_blocked_until = 0.0
+        self._bpm_cache: OrderedDict[str, tuple[float, str]] = OrderedDict()
+        self._bpm_negative: dict[str, float] = {}
+        self._repolls: dict[str, Any] = {}
 
     # -- players -----------------------------------------------------------
 
@@ -322,6 +403,8 @@ class MusicService:
         """``(entity_id, area_id)`` of all Music Assistant media players."""
         from homeassistant.helpers import (  # noqa: PLC0415
             device_registry as dr,
+        )
+        from homeassistant.helpers import (
             entity_registry as er,
         )
 
@@ -404,8 +487,12 @@ class MusicService:
     # -- Music Assistant client ----------------------------------------------
 
     def _mass(self) -> Any | None:
+        """MA client of the loaded config entry (not a public API: guard everything)."""
         try:
             for entry in self.hass.config_entries.async_entries(MA_PLATFORM):
+                state = getattr(entry, "state", None)
+                if state is not None and getattr(state, "value", state) != "loaded":
+                    continue
                 mass = getattr(getattr(entry, "runtime_data", None), "mass", None)
                 if mass is not None:
                     return mass
@@ -431,15 +518,86 @@ class MusicService:
         if parts is None:
             return None
         provider, item_id = parts
-        result = await self.async_ma_command("audio_analysis/wave_form", item_id=item_id, provider=provider)
+        result = await self.async_ma_command(
+            "audio_analysis/wave_form", item_id=item_id, provider=provider
+        )
         if isinstance(result, dict):
             result = result.get("wave_form") or result.get("data")
         return normalize_envelope(result)
 
     # -- BPM -------------------------------------------------------------------
 
+    async def async_ma_track(self, track: TrackInfo) -> dict[str, Any] | None:
+        """Raw MA track dict (``music/tracks/get``) of the playing item, or None."""
+        mass = self._mass()
+        if mass is None:
+            return None
+        item_id: Any = None
+        provider: Any = None
+        try:
+            state = self.hass.states.get(track.player_entity_id)
+            queue_id = state.attributes.get("active_queue") if state else None
+            if queue_id:
+                media = mass.player_queues.get(queue_id).current_item.media_item
+                item_id, provider = media.item_id, media.provider
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("MA queue lookup failed", exc_info=True)
+        if not item_id and track.uri:
+            found = await self.async_ma_command("music/item_by_uri", uri=track.uri)
+            if isinstance(found, dict):
+                item_id, provider = found.get("item_id"), found.get("provider")
+        if not item_id or not provider:
+            return None
+        raw = await self.async_ma_command(
+            "music/tracks/get", item_id=item_id, provider_instance_id_or_domain=provider
+        )
+        return raw if isinstance(raw, dict) else None
+
+    def schedule_ma_repoll(self, track: TrackInfo) -> None:
+        """MA analyses while playing: re-poll in the background, never block."""
+        key = track.uri
+        running = self._repolls.get(key)
+        if not key or (running is not None and not running.done()):
+            return
+        self._repolls[key] = self.hass.async_create_task(self._repoll(track, key))
+
+    async def _repoll(self, track: TrackInfo, key: str) -> None:
+        try:
+            for _ in range(REPOLL_ATTEMPTS):
+                await asyncio.sleep(REPOLL_INTERVAL_S)
+                bpm = _bpm_from_raw(await self.async_ma_track(track))
+                if bpm:
+                    self._remember_bpm(key, bpm, "music_assistant")
+                    return
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("MA bpm re-poll failed", exc_info=True)
+
+    @staticmethod
+    def _bpm_key(track: TrackInfo) -> str:
+        return track.uri or f"{track.artist}|{track.title}"
+
+    def _remember_bpm(self, key: str, bpm: float, source: str) -> None:
+        self._bpm_cache[key] = (bpm, source)
+        self._bpm_cache.move_to_end(key)
+        self._bpm_negative.pop(key, None)
+        while len(self._bpm_cache) > BPM_CACHE_SIZE:
+            self._bpm_cache.popitem(last=False)
+
+    def audio_features(self, track: TrackInfo) -> dict[str, float] | None:
+        """Measured ``energy``/``danceability`` (0..1) when a source delivered them."""
+        return self.features.get(track.uri or "")
+
     async def async_bpm(self, track: TrackInfo) -> tuple[float, str] | None:
         """First measured BPM from the registered sources; never an LLM guess."""
+        key = self._bpm_key(track)
+        cached = self._bpm_cache.get(key)
+        if cached is not None:
+            self._bpm_cache.move_to_end(key)
+            return cached
+        if self._bpm_negative.get(key, 0.0) > time.monotonic():
+            return None
         for name, source in list(_BPM_SOURCES):
             try:
                 async with asyncio.timeout(HTTP_TIMEOUT_S + 2):
@@ -449,7 +607,9 @@ class MusicService:
                 continue
             bpm = valid_bpm(value)
             if bpm:
+                self._remember_bpm(key, bpm, name)
                 return bpm, name
+        self._bpm_negative[key] = time.monotonic() + NEGATIVE_TTL_S
         return None
 
     # -- listener ----------------------------------------------------------------
@@ -469,9 +629,7 @@ class MusicService:
         @callback
         def _changed(event: Any) -> None:
             track = track_from_state(player, event.data.get("new_state"))
-            key = (
-                (track.uri, track.title, track.artist, track.is_playing) if track else None
-            )
+            key = (track.uri, track.title, track.artist, track.is_playing) if track else None
             if key == last[0]:
                 return
             last[0] = key
