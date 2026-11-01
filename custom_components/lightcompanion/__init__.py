@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import logging
+from dataclasses import asdict, dataclass
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -54,9 +53,7 @@ def _loaded_data(hass: HomeAssistant) -> LightCompanionData:
     for entry in hass.config_entries.async_loaded_entries(DOMAIN):
         if getattr(entry, "runtime_data", None) is not None:
             return entry.runtime_data
-    raise ServiceValidationError(
-        translation_domain=DOMAIN, translation_key="not_loaded"
-    )
+    raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -71,7 +68,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             )
         except HomeAssistantError:
             raise
-        except Exception as err:  # noqa: BLE001 - surface any planner failure as HA error
+        except Exception as err:
             raise HomeAssistantError(f"Light Companion chat failed: {err}") from err
         return asdict(result)
 

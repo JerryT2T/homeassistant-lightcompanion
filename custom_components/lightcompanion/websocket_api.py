@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-from datetime import timedelta
 import inspect
 import logging
+from dataclasses import asdict
+from datetime import timedelta
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -139,7 +138,7 @@ async def ws_chat(
         result = await entry.runtime_data.planner.async_chat(
             msg["area_id"], msg["text"], msg.get("language")
         )
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:
         if type(err).__name__ == "EffectBlockedError":
             connection.send_error(msg["id"], "blocked", str(err))
             return
@@ -178,7 +177,8 @@ def ws_settings_get(
     if entry is None:
         _not_loaded(connection, msg["id"])
         return
-    connection.send_result(msg["id"], _settings_payload(hass, entry.runtime_data.settings, connection))
+    payload = _settings_payload(hass, entry.runtime_data.settings, connection)
+    connection.send_result(msg["id"], payload)
 
 
 @websocket_api.websocket_command(

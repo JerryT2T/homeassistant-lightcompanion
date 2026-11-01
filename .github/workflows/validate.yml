@@ -1,0 +1,75 @@
+name: Validate
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    name: Run tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install test dependencies
+        run: pip install -r requirements_test.txt
+      - name: Lint
+        run: ruff check custom_components tests scripts
+      - name: Run pytest
+        run: pytest tests/ -v --cov=custom_components/lightcompanion --cov-report=term-missing
+
+  validate:
+    runs-on: ubuntu-latest
+    name: Validate code and versions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Python dependencies
+        run: pip install pyyaml
+      - name: Validate Python syntax
+        run: find custom_components/lightcompanion -name "*.py" -exec python -m py_compile {} +
+      - name: Validate JavaScript syntax
+        run: find custom_components/lightcompanion/frontend -name "*.js" -exec node --check {} +
+      - name: Validate YAML and JSON
+        run: |
+          python - <<'EOF'
+          import glob, json, yaml
+          yaml.safe_load(open("custom_components/lightcompanion/services.yaml", encoding="utf-8"))
+          files = ["custom_components/lightcompanion/manifest.json",
+                   "custom_components/lightcompanion/strings.json", "hacs.json"]
+          for f in files + glob.glob("custom_components/lightcompanion/translations/*.json"):
+              json.load(open(f, encoding="utf-8"))
+          EOF
+      - name: Validate version alignment
+        run: python scripts/bump_versions.py --check
+
+  hassfest:
+    runs-on: ubuntu-latest
+    name: Hassfest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    runs-on: ubuntu-latest
+    name: HACS validation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration

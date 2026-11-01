@@ -6,7 +6,6 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -84,9 +83,7 @@ _KEY_SELECTOR = selector.TextSelector(
 )
 _TEXT_SELECTOR = selector.TextSelector()
 _KEYWORD_SELECTOR = selector.TextSelector(selector.TextSelectorConfig(multiple=True))
-_AGENT_SELECTOR = selector.ConversationAgentSelector(
-    selector.ConversationAgentSelectorConfig()
-)
+_AGENT_SELECTOR = selector.ConversationAgentSelector(selector.ConversationAgentSelectorConfig())
 _AI_TASK_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="ai_task"))
 
 
@@ -111,11 +108,17 @@ class LightCompanionConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
-                {vol.Required(CONF_LLM_PROVIDER, default=DEFAULT_LLM_PROVIDER): _provider_selector()}
+                {
+                    vol.Required(
+                        CONF_LLM_PROVIDER, default=DEFAULT_LLM_PROVIDER
+                    ): _provider_selector()
+                }
             ),
         )
 
-    async def async_step_ai_task(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_ai_task(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Optional ai_task entity (empty = default entity)."""
         if user_input is not None:
             if user_input.get(CONF_AI_TASK_ENTITY):
