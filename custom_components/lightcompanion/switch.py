@@ -38,9 +38,7 @@ class LightCompanionEffectSwitch(SwitchEntity):
     _attr_translation_key = "effect"
     _attr_should_poll = False
 
-    def __init__(
-        self, entry_id: str, engine: EffectEngine, area_id: str, area_name: str
-    ) -> None:
+    def __init__(self, entry_id: str, engine: EffectEngine, area_id: str, area_name: str) -> None:
         self._engine = engine
         self._area_id = area_id
         self._attr_unique_id = f"{entry_id}_{area_id}_effect"

@@ -8,8 +8,8 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
-from homeassistant.core import Context, HomeAssistant, ServiceCall
 import pytest
+from homeassistant.core import Context, HomeAssistant, ServiceCall
 
 from custom_components.lightcompanion import engine as engine_mod
 from custom_components.lightcompanion.engine import (
@@ -123,9 +123,7 @@ def env(hass: HomeAssistant) -> Env:
 
 @pytest.fixture(autouse=True)
 def fast_tempo(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        engine_mod, "TEMPO_INTERVAL_S", {"slow": 0.2, "medium": 0.1, "fast": 0.05}
-    )
+    monkeypatch.setattr(engine_mod, "TEMPO_INTERVAL_S", {"slow": 0.2, "medium": 0.1, "fast": 0.05})
 
 
 # ---------------------------------------------------------------- pure logic
@@ -182,7 +180,9 @@ def test_frames_breathe_and_pulse_alternate() -> None:
 
 
 def test_frames_color_cycle_and_sparkle() -> None:
-    assert [build_frame("color_cycle", s, 2, 3, 50, 3, random.Random())[0].color_index for s in range(4)] == [0, 1, 2, 0]
+    assert [
+        build_frame("color_cycle", s, 2, 3, 50, 3, random.Random())[0].color_index for s in range(4)
+    ] == [0, 1, 2, 0]
     sparks = build_frame("sparkle", 0, 200, 4, 60, 5, random.Random(7))
     bright = [c for c in sparks if c.brightness_pct == 60]
     assert 0 < len(bright) < 200
@@ -277,7 +277,10 @@ async def test_unchanged_frames_are_not_resent(hass: HomeAssistant, env: Env) ->
     set_on(hass, "light.a")
     eng = EffectEngine(hass, make_settings())
     await eng.async_apply(
-        "living", make_plan(pattern="color_cycle", palette=(RED,)), [make_light("light.a")], source="chat"
+        "living",
+        make_plan(pattern="color_cycle", palette=(RED,)),
+        [make_light("light.a")],
+        source="chat",
     )
     await asyncio.sleep(0.3)
     await eng.async_stop("living", restore=False)
@@ -420,9 +423,7 @@ async def test_bus_events(hass: HomeAssistant, env: Env) -> None:
 # ------------------------------------------------- external change policy (1)
 
 
-async def test_external_change_makes_engine_yield_that_light(
-    hass: HomeAssistant, env: Env
-) -> None:
+async def test_external_change_makes_engine_yield_that_light(hass: HomeAssistant, env: Env) -> None:
     set_on(hass, "light.a", "light.b")
     eng = EffectEngine(hass, make_settings())
     lights = [make_light("light.a"), make_light("light.b")]
@@ -538,9 +539,7 @@ def group_state(hass: HomeAssistant, group: str, members: list[str]) -> None:
     hass.states.async_set(group, "on", {"entity_id": members})
 
 
-async def test_group_with_all_members_is_driven_as_one_call(
-    hass: HomeAssistant, env: Env
-) -> None:
+async def test_group_with_all_members_is_driven_as_one_call(hass: HomeAssistant, env: Env) -> None:
     set_on(hass, "light.a", "light.b")
     group_state(hass, "light.grp", ["light.a", "light.b"])
     eng = EffectEngine(hass, make_settings())
@@ -556,9 +555,7 @@ async def test_group_with_all_members_is_driven_as_one_call(
     assert targets == {"light.grp"}  # never group AND members
 
 
-async def test_per_bulb_patterns_drive_members_not_the_group(
-    hass: HomeAssistant, env: Env
-) -> None:
+async def test_per_bulb_patterns_drive_members_not_the_group(hass: HomeAssistant, env: Env) -> None:
     set_on(hass, "light.a", "light.b")
     group_state(hass, "light.grp", ["light.a", "light.b"])
     eng = EffectEngine(hass, make_settings())
@@ -601,9 +598,7 @@ async def test_existing_group_covering_the_targets_is_preferred(
     assert set(env.light_targets()) == {"light.ab", "light.c"}
 
 
-async def test_excluded_group_entity_is_not_used_as_shortcut(
-    hass: HomeAssistant, env: Env
-) -> None:
+async def test_excluded_group_entity_is_not_used_as_shortcut(hass: HomeAssistant, env: Env) -> None:
     set_on(hass, "light.a", "light.b")
     group_state(hass, "light.ab", ["light.a", "light.b"])
     eng = EffectEngine(hass, make_settings(excluded_lights=("light.ab",)))

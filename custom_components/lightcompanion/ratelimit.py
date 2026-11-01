@@ -7,8 +7,8 @@ budget or returns ``False`` so the caller drops the (stale) frame.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import time
+from dataclasses import dataclass
 
 DEFAULT_TRANSPORT = "generic"
 # Longest a frame may wait for a slot before it is considered stale.
@@ -41,9 +41,7 @@ TRANSPORTS: dict[str, TransportProfile] = {
 class RateLimiter:
     """Global plus per-transport spacing limiter (slot reservation, no queue)."""
 
-    def __init__(
-        self, global_per_s: int, *, max_wait_s: float = DEFAULT_MAX_WAIT_S
-    ) -> None:
+    def __init__(self, global_per_s: int, *, max_wait_s: float = DEFAULT_MAX_WAIT_S) -> None:
         self._global_interval = 1.0 / max(float(global_per_s), 0.1)
         self._max_wait = max_wait_s
         self._global_next = 0.0

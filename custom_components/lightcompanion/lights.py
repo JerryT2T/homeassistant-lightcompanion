@@ -10,9 +10,17 @@ from homeassistant.components.light import ATTR_SUPPORTED_COLOR_MODES
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import (
     area_registry as ar,
+)
+from homeassistant.helpers import (
     device_registry as dr,
+)
+from homeassistant.helpers import (
     entity_registry as er,
+)
+from homeassistant.helpers import (
     floor_registry as fr,
+)
+from homeassistant.helpers import (
     label_registry as lr,
 )
 from homeassistant.util import color as color_util
@@ -48,9 +56,7 @@ def _restrictiveness(transport: str) -> float:
     return TRANSPORTS.get(transport, TRANSPORTS[DEFAULT_TRANSPORT]).max_per_s
 
 
-def _platform_transport(
-    platform: str, device: dr.DeviceEntry | None = None
-) -> str | None:
+def _platform_transport(platform: str, device: dr.DeviceEntry | None = None) -> str | None:
     """Map an entity-registry platform to a transport class (None = unknown)."""
     if platform == "hue":
         return "hue"
@@ -95,8 +101,7 @@ def detect_transport(
     members = [m for m in _members(hass, entity_id) if m not in _seen]
     if platform == "group" or (direct is None and members):
         classes = [
-            detect_transport(hass, m, ent_reg, dev_reg, _seen | {entity_id})
-            for m in members
+            detect_transport(hass, m, ent_reg, dev_reg, _seen | {entity_id}) for m in members
         ]
         if classes:
             return min(classes, key=_restrictiveness)
@@ -138,9 +143,7 @@ def _is_excluded(
         return True
     haystack = " ".join((name, entity_id, area_name or "")).lower()
     return any(
-        kw.strip().lower() in haystack
-        for kw in settings.exclude_keywords
-        if kw and kw.strip()
+        kw.strip().lower() in haystack for kw in settings.exclude_keywords if kw and kw.strip()
     )
 
 
@@ -155,12 +158,7 @@ def _build_info(
 ) -> LightInfo:
     state = hass.states.get(entry.entity_id)
     attrs: dict[str, Any] = dict(state.attributes) if state else {}
-    name = (
-        attrs.get("friendly_name")
-        or entry.name
-        or entry.original_name
-        or entry.entity_id
-    )
+    name = attrs.get("friendly_name") or entry.name or entry.original_name or entry.entity_id
     modes = tuple(str(m) for m in (attrs.get(ATTR_SUPPORTED_COLOR_MODES) or ()))
     min_k = attrs.get("min_color_temp_kelvin")
     max_k = attrs.get("max_color_temp_kelvin")
@@ -197,9 +195,7 @@ def _iter_light_entries(
         yield entry
 
 
-def _resolve_area(
-    entry: er.RegistryEntry, dev_reg: dr.DeviceRegistry
-) -> str | None:
+def _resolve_area(entry: er.RegistryEntry, dev_reg: dr.DeviceRegistry) -> str | None:
     if entry.area_id:
         return entry.area_id
     if entry.device_id:

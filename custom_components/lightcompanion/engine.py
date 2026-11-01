@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-from collections import OrderedDict
-from collections.abc import Callable, Sequence
 import contextlib
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
 import logging
 import math
 import random
 import time
+from collections import OrderedDict
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import EVENT_STATE_CHANGED
@@ -39,9 +39,7 @@ STROBE_COOLDOWN_S = 30.0
 MAX_FLASHES_PER_S = 3.0
 STROBE_INTERVAL_S = 0.25  # allowed (party + allow_strobe)
 STROBE_SAFE_INTERVAL_S = 0.34
-DYNAMIC_PATTERNS = frozenset(
-    {"breathe", "pulse", "wave", "color_cycle", "sparkle", "strobe"}
-)
+DYNAMIC_PATTERNS = frozenset({"breathe", "pulse", "wave", "color_cycle", "sparkle", "strobe"})
 # Patterns where every light shows the same thing -> one call to a group is enough.
 UNIFORM_PATTERNS = frozenset({"static", "breathe", "pulse", "color_cycle", "strobe"})
 QUIET_AFTER_COMMAND_S = 2.0
@@ -68,9 +66,7 @@ class FrameCmd:
     fast: bool = False  # short transition (snappy patterns)
 
 
-def effective_pattern(
-    pattern: str, elapsed_s: float, strobe_allowed: bool
-) -> str:
+def effective_pattern(pattern: str, elapsed_s: float, strobe_allowed: bool) -> str:
     """Strobe policy: bursts <= 8 s, then pulse for 30 s; never when not allowed."""
     if pattern != "strobe":
         return pattern
@@ -126,9 +122,7 @@ def build_frame(
             else:
                 wave = 0.5 + 0.5 * math.sin(2 * math.pi * (i - step) / max(n_units, 4))
                 depth = _depth(intensity)
-                cmds.append(
-                    FrameCmd(0, max(1, round(base * (1 - depth * (1 - wave)))))
-                )
+                cmds.append(FrameCmd(0, max(1, round(base * (1 - depth * (1 - wave))))))
         return cmds
     if pattern == "sparkle":
         frac = 0.15 + 0.1 * max(1, min(5, intensity))
@@ -199,9 +193,7 @@ class EffectEngine:
     def is_active(self, area_id: str) -> bool:
         return area_id in self._runs
 
-    def last(
-        self, area_id: str
-    ) -> tuple[LightPlan, tuple[LightInfo, ...], str] | None:
+    def last(self, area_id: str) -> tuple[LightPlan, tuple[LightInfo, ...], str] | None:
         """Last applied plan, lights and source of an area (for switch turn_on)."""
         return self._last.get(area_id)
 
@@ -256,9 +248,7 @@ class EffectEngine:
             self._fire(EVENT_EFFECT_STOPPED, run, reason)
         self._notify()
 
-    async def async_stop_all(
-        self, *, restore: bool = True, reason: str = "unload"
-    ) -> None:
+    async def async_stop_all(self, *, restore: bool = True, reason: str = "unload") -> None:
         for area_id in list(self._runs):
             await self.async_stop(area_id, restore=restore, reason=reason)
 
@@ -314,9 +304,7 @@ class EffectEngine:
             return [m for m in members if isinstance(m, str)]
         return []
 
-    def _unit_from_members(
-        self, entity_id: str, infos: list[LightInfo]
-    ) -> _Unit | None:
+    def _unit_from_members(self, entity_id: str, infos: list[LightInfo]) -> _Unit | None:
         """Group unit from member infos; None if members differ in capability."""
         caps = {(i.supports_color, _dimmable(i.color_modes)) for i in infos}
         if len(caps) != 1:
@@ -390,9 +378,7 @@ class EffectEngine:
                 consumed.add(group.entity_id)
                 continue
             if all(m in by_id and m not in consumed for m in members) and uniform:
-                unit = self._unit_from_members(
-                    group.entity_id, [by_id[m] for m in members]
-                )
+                unit = self._unit_from_members(group.entity_id, [by_id[m] for m in members])
                 if unit is not None:
                     units.append(unit)
                     consumed.add(group.entity_id)
@@ -408,9 +394,7 @@ class EffectEngine:
                 units.append(self._unit_from_info(light))
         return units
 
-    def _covering_groups(
-        self, rest: list[LightInfo], consumed: set[str]
-    ) -> list[_Unit]:
+    def _covering_groups(self, rest: list[LightInfo], consumed: set[str]) -> list[_Unit]:
         """Use existing group entities whose members are all among our targets."""
         ids = {light.entity_id: light for light in rest if not light.is_group}
         found: list[tuple[str, list[str]]] = []
@@ -496,9 +480,7 @@ class EffectEngine:
                     max(plan.transition_s, 0.0),
                 )
                 await self._send_reliable(unit, data)
-        if dynamic and any(
-            u.dimmable and not u.native_effect and not u.yielded for u in units
-        ):
+        if dynamic and any(u.dimmable and not u.native_effect and not u.yielded for u in units):
             run.task = self.hass.async_create_background_task(
                 self._run_loop(run), f"lightcompanion_effect_{area_id}"
             )
@@ -587,14 +569,10 @@ class EffectEngine:
         try:
             while True:
                 frame_start = time.monotonic()
-                pattern = effective_pattern(
-                    plan.pattern, frame_start - run.started_mono, strobe_ok
-                )
+                pattern = effective_pattern(plan.pattern, frame_start - run.started_mono, strobe_ok)
                 interval = frame_interval(pattern, plan.tempo, strobe_ok)
                 active = [
-                    u
-                    for u in run.units
-                    if u.dimmable and not u.native_effect and not u.yielded
+                    u for u in run.units if u.dimmable and not u.native_effect and not u.yielded
                 ]
                 cmds = build_frame(
                     pattern,
@@ -626,9 +604,7 @@ class EffectEngine:
                         cmd.brightness_pct,
                         transition,
                     )
-                    key = tuple(
-                        (k, str(v)) for k, v in sorted(data.items()) if k != "transition"
-                    )
+                    key = tuple((k, str(v)) for k, v in sorted(data.items()) if k != "transition")
                     if key == unit.last:
                         continue
                     if not await self._limiter.acquire(unit.transport):
@@ -647,9 +623,7 @@ class EffectEngine:
             raise
         except Exception:
             _LOGGER.exception("Effect loop for %s crashed", run.area_id)
-            self.hass.async_create_task(
-                self.async_stop(run.area_id, restore=True, reason="error")
-            )
+            self.hass.async_create_task(self.async_stop(run.area_id, restore=True, reason="error"))
 
     # ---- snapshot / restore / compatibility
 
@@ -693,9 +667,7 @@ class EffectEngine:
                 found.append((state.entity_id, overlap))
         return found
 
-    async def _set_manual_control(
-        self, items: list[tuple[str, list[str]]], value: bool
-    ) -> None:
+    async def _set_manual_control(self, items: list[tuple[str, list[str]]], value: bool) -> None:
         for switch_id, lights in items:
             try:
                 await self.hass.services.async_call(
@@ -712,15 +684,11 @@ class EffectEngine:
         """Keep Adaptive Lighting (if installed) from fighting our colours."""
         if not self.hass.services.has_service("adaptive_lighting", "set_manual_control"):
             return
-        entity_ids = {m for u in run.units for m in u.members} | {
-            u.entity_id for u in run.units
-        }
+        entity_ids = {m for u in run.units for m in u.members} | {u.entity_id for u in run.units}
         run.manual_control = self._adaptive_switches(entity_ids)
         await self._set_manual_control(run.manual_control, True)
 
-    async def _teardown(
-        self, run: _Run, *, restore: bool, keep_snapshots: bool = False
-    ) -> None:
+    async def _teardown(self, run: _Run, *, restore: bool, keep_snapshots: bool = False) -> None:
         if run.task is not None:
             run.task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
