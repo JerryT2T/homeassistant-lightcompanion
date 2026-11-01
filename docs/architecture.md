@@ -416,3 +416,23 @@ Errors use `connection.send_error(msg_id, code, message)` with codes
 * `lightcompanion-panel.js` — custom element `lightcompanion-panel`; renders
   one `lightcompanion-card` full height, passes `hass`/`narrow`.
 ```
+
+## Addendum A — coexisting with existing light logic
+
+Derived from an inventory of a real installation (scenes, cinema scripts,
+cleaning mode, presence sensors, Hue groups, aquarium lights); all generic.
+
+* Options: `blocking_entities` (input_boolean/switch/binary_sensor, default
+  `[]`) — while one is on, `EffectEngine.async_apply` raises
+  `EffectBlockedError(entity_id)` and running effects stop with restore;
+  `exclude_label` (default `lightcompanion_exclude`) — labelled lights are
+  excluded like keyword/list matches.
+* External changes: a light changed under a foreign `Context` (user, scene,
+  script, automation) is released by the engine (`yield_light`).
+* Unavailable lights are skipped; a group and its members are never driven
+  both; on/off-only devices are never blinked by dynamic patterns.
+* Adaptive Lighting: `adaptive_lighting.set_manual_control` during effects,
+  released on stop (only if the service exists).
+* Bus events: `lightcompanion_effect_started|stopped|skipped`
+  (`area_id`, `pattern`, `source`, `reason`).
+* Planner maps `EffectBlockedError` to `ChatResult.error == "blocked"`.
