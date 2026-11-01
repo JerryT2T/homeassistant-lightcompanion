@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    name: Create GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate versions
+        run: python scripts/bump_versions.py --check
+      - name: Check tag matches manifest
+        id: version
+        run: |
+          version="${GITHUB_REF#refs/tags/v}"
+          manifest=$(python -c "import json;print(json.load(open('custom_components/lightcompanion/manifest.json'))['version'])")
+          [ "$version" = "$manifest" ] || { echo "Tag $version != manifest $manifest"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "v${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            1. HACS -> Integrations -> three-dot menu -> Custom repositories
+            2. Add `https://github.com/Jerry0022/homeassistant-lightcompanion` as category **Integration**
+            3. Download **Light Companion**, then restart Home Assistant
+            4. Settings -> Devices & services -> Add integration -> **Light Companion**
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

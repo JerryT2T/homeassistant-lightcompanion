@@ -2,72 +2,61 @@
 
 from __future__ import annotations
 
-from ha_customapps.const import (  # noqa: F401 — re-exported for backward compat
-    CONF_API_KEY,
-    CONF_BASE_URL,
-    CONF_LLM_SOURCE,
-    CONF_MODEL,
-    CONF_PROVIDER,
-    DEFAULT_BASE_URL,
-    DEFAULT_MODEL,
-    DEFAULT_PROVIDER,
-    LLM_SOURCE_HA_CONVERSATION,
-    OPENAI_AGENT_DOMAINS,
-    PROVIDER_MODELS,
-)
+from homeassistant.const import Platform
 
 DOMAIN = "lightcompanion"
-PLATFORMS: list[str] = []
-
-# Backward-compat alias for existing code that uses the old name
-LLM_SOURCE_HA_OPENAI = LLM_SOURCE_HA_CONVERSATION
-OPENAI_INTEGRATION_DOMAINS = OPENAI_AGENT_DOMAINS
-
-# Provider → HA integration domain mapping (all supported conversation agents)
-PROVIDER_AGENT_DOMAINS: dict[str, tuple[str, ...]] = {
-    "openai": ("openai_conversation", "openai"),
-    "google": ("google_generative_ai_conversation",),
-    "anthropic": ("anthropic",),
-    "ollama": ("ollama",),
-}
-
-# Flat tuple of every supported domain — used for "is any LLM available?" checks
-ALL_AGENT_DOMAINS: tuple[str, ...] = tuple(
-    domain
-    for domains in PROVIDER_AGENT_DOMAINS.values()
-    for domain in domains
-)
-
+VERSION = "1.0.0"
+PLATFORMS = [Platform.SWITCH]
+FRONTEND_URL_BASE = "/lightcompanion_static"
+CARD_JS = "lightcompanion-card.js"
+PANEL_JS = "lightcompanion-panel.js"
 PANEL_URL_PATH = "lightcompanion"
-PANEL_TITLE = "Light Companion"
-PANEL_ICON = "mdi:message-processing-outline"
 PANEL_COMPONENT_NAME = "lightcompanion-panel"
-PANEL_MODULE_PATH = "/api/lightcompanion/static/lightcompanion-panel.js"
+PANEL_TITLE = "Light Companion"
+PANEL_ICON = "mdi:lightbulb-auto"
+EVENT_STATUS = f"{DOMAIN}_status"
 
-API_PROCESS_PATH = "/api/lightcompanion/process"
-API_ENTITIES_PATH = "/api/lightcompanion/entities"
-API_OPTIONS_PATH = "/api/lightcompanion/options"
-API_STATUS_PATH = "/api/lightcompanion/status"
+# Option keys
+CONF_LLM_PROVIDER = "llm_provider"
+CONF_AI_TASK_ENTITY = "ai_task_entity"
+CONF_CONVERSATION_AGENT = "conversation_agent"
+CONF_API_KEY = "api_key"
+CONF_MODEL = "model"
+CONF_AI_CALLS_PER_HOUR = "ai_calls_per_hour"
+CONF_LIGHT_RATE = "light_rate"
+CONF_ALLOW_STROBE = "allow_strobe"
+CONF_EXCLUDED_LIGHTS = "excluded_lights"
+CONF_EXCLUDE_KEYWORDS = "exclude_keywords"
+CONF_PLAYER_OVERRIDES = "player_overrides"
+CONF_DEFAULT_AREA = "default_area"
+CONF_SHOW_PANEL = "show_panel"
+CONF_BLOCKING_ENTITIES = "blocking_entities"
+CONF_EXCLUDE_LABEL = "exclude_label"
 
-JSON_SCHEMA_HINT = {
-    "type": "object",
-    "required": ["summary", "actions"],
-    "properties": {
-        "summary": {"type": "string"},
-        "actions": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "required": ["entity_id", "service_data"],
-                "properties": {
-                    "entity_id": {"type": "string"},
-                    "service": {
-                        "type": "string",
-                        "enum": ["turn_on", "turn_off", "toggle"],
-                    },
-                    "service_data": {"type": "object"},
-                },
-            },
-        },
-    },
+PROVIDER_AI_TASK = "ai_task"
+PROVIDER_CONVERSATION = "conversation"
+LLM_PROVIDERS = ("ai_task", "conversation", "openai", "anthropic", "google")
+KEY_PROVIDERS = ("openai", "anthropic", "google")
+DEFAULT_MODELS = {
+    "openai": "gpt-5-mini",
+    "anthropic": "claude-haiku-4-5",
+    "google": "gemini-2.5-flash",
 }
+
+# Defaults and ranges
+DEFAULT_LLM_PROVIDER = PROVIDER_AI_TASK
+DEFAULT_AI_CALLS_PER_HOUR = 50
+MIN_AI_CALLS_PER_HOUR = 5
+MAX_AI_CALLS_PER_HOUR = 200
+DEFAULT_LIGHT_RATE = 4
+MIN_LIGHT_RATE = 1
+MAX_LIGHT_RATE = 10
+DEFAULT_ALLOW_STROBE = False
+DEFAULT_EXCLUDE_KEYWORDS = ("aquarium", "terrarium")
+DEFAULT_SHOW_PANEL = False
+DEFAULT_EXCLUDE_LABEL = "lightcompanion_exclude"
+BLOCKING_DOMAINS = ("input_boolean", "switch", "binary_sensor")
+
+# Service names
+SERVICE_CHAT = "chat"
+SERVICE_STOP = "stop"

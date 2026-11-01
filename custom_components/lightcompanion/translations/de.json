@@ -3,16 +3,94 @@
     "step": {
       "user": {
         "title": "Light Companion",
-        "description": "Light Companion nutzt jeden unterstützten Home Assistant Conversation Agent (OpenAI, Anthropic, Google, Ollama) für LLM-Zugriff."
+        "description": "Wähle den einen KI-Anbieter, der deinen Chat in Lichtpläne übersetzt.",
+        "data": { "llm_provider": "KI-Anbieter" }
+      },
+      "ai_task": {
+        "title": "AI Task",
+        "description": "Optional eine AI-Task-Entität wählen. Leer lassen für die Standard-Entität.",
+        "data": { "ai_task_entity": "AI-Task-Entität" }
+      },
+      "conversation": {
+        "title": "Konversations-Agent",
+        "data": { "conversation_agent": "Konversations-Agent" }
+      },
+      "api": {
+        "title": "API-Zugang",
+        "description": "API-Schlüssel für {provider} eingeben. Er wird im Konfigurationseintrag gespeichert und nie wieder angezeigt.",
+        "data": { "api_key": "API-Schlüssel", "model": "Modell" }
       }
     },
-    "abort": {
-      "missing_llm": "Es wurde keine unterstützte Konversationsagenten-Integration gefunden. Richte mindestens eine ein (OpenAI Conversation, Anthropic, Google Generative AI oder Ollama) unter Einstellungen > Geräte & Dienste und versuche es erneut.",
-      "missing_openai": "Es wurde keine unterstützte Konversationsagenten-Integration gefunden."
+    "error": { "api_key_required": "Für diesen Anbieter ist ein API-Schlüssel erforderlich." },
+    "abort": { "single_instance_allowed": "Light Companion ist bereits eingerichtet." }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Light-Companion-Optionen",
+        "description": "Genau ein KI-Anbieter ist aktiv. API-Schlüssel leer lassen, um den gespeicherten zu behalten.",
+        "data": {
+          "llm_provider": "KI-Anbieter",
+          "ai_task_entity": "AI-Task-Entität (ai_task)",
+          "conversation_agent": "Konversations-Agent (conversation)",
+          "api_key": "API-Schlüssel (OpenAI, Anthropic, Google)",
+          "model": "Modell (OpenAI, Anthropic, Google)",
+          "ai_calls_per_hour": "KI-Aufrufe pro Stunde",
+          "light_rate": "Lichtbefehle pro Sekunde",
+          "allow_strobe": "Stroboskop im Party-Modus erlauben",
+          "excluded_lights": "Ausgeschlossene Lichter",
+          "exclude_keywords": "Ausschluss-Stichwörter (Name oder Bereich)",
+          "exclude_label": "Ausschluss-Label",
+          "blocking_entities": "Sperr-Entitäten (Effekte stoppen, solange eine an ist)",
+          "default_area": "Standardbereich",
+          "show_panel": "Seitenleisten-Panel anzeigen"
+        },
+        "data_description": {
+          "exclude_label": "Lichter mit diesem Label werden nie angefasst.",
+          "blocking_entities": "Zum Beispiel ein Schalter für Putz- oder Schlafmodus."
+        }
+      }
+    },
+    "error": {
+      "api_key_required": "Für diesen Anbieter ist ein API-Schlüssel erforderlich.",
+      "invalid_options": "Die Optionen sind ungültig."
     }
   },
-  "panel": {
-    "openai_missing": "Keine LLM-Integration verfügbar.",
-    "open_integrations_cta": "Integrationen öffnen"
+  "selector": {
+    "llm_provider": {
+      "options": {
+        "ai_task": "Home Assistant AI Task",
+        "conversation": "Konversations-Agent",
+        "openai": "OpenAI (eigener Schlüssel)",
+        "anthropic": "Anthropic (eigener Schlüssel)",
+        "google": "Google Gemini (eigener Schlüssel)"
+      }
+    }
+  },
+  "services": {
+    "chat": {
+      "name": "Chat",
+      "description": "Sendet eine Lichtanfrage für einen Bereich und liefert Antwort und angewendeten Plan zurück.",
+      "fields": {
+        "area_id": { "name": "Bereich", "description": "Bereich, dessen Lichter gesteuert werden." },
+        "text": { "name": "Text", "description": "Was die Lichter tun sollen." },
+        "language": { "name": "Sprache", "description": "Sprache der Antwort." }
+      }
+    },
+    "stop": {
+      "name": "Stopp",
+      "description": "Beendet den Effekt in einem Bereich und stellt die Lichter wieder her.",
+      "fields": {
+        "area_id": { "name": "Bereich", "description": "Zu stoppender Bereich." }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": { "message": "Light Companion ist nicht geladen." }
+  },
+  "entity": {
+    "switch": {
+      "effect": { "name": "{area} Effekt" }
+    }
   }
 }
