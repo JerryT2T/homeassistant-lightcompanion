@@ -1,0 +1,24 @@
+chat:
+  fields:
+    area_id:
+      required: true
+      example: living_room
+      selector:
+        area:
+    text:
+      required: true
+      example: "Disco like the music, but dark colors"
+      selector:
+        text:
+    language:
+      required: false
+      example: en
+      selector:
+        language:
+stop:
+  fields:
+    area_id:
+      required: true
+      example: living_room
+      selector:
+        area:

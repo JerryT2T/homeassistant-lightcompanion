@@ -1,64 +1,65 @@
-# Home Assistant Light Companion
+# Light Companion
 
-Light Companion is a Home Assistant custom integration that lets you control entities in the `light` domain with natural-language commands interpreted by an LLM.
+Home Assistant integration that turns chat or voice ("disco like the music, but dark colors") into a
+validated light plan and plays it with a local effect engine on the lights of one area (room).
+It can follow the music playing in that room through Music Assistant. Music Assistant is only **read**,
+never controlled. The integration controls entities in the `light` domain only.
 
 ## Installation (HACS)
-1. Open HACS in Home Assistant.
-2. Go to **HACS → 3-dot menu → Custom repositories**.
-3. Add repository URL `https://github.com/Jerry0022/homeassistant-lightcompanion` with category **Integration**.
-4. Search for **Light Companion** in HACS and install it.
-5. Restart Home Assistant.
-6. Go to **Settings → Devices & Services → Add Integration** and add **Light Companion**.
 
-### Can't find Light Companion in HACS search?
-- Light Companion is currently intended to be installed as a **custom repository**.
-- It may not appear in HACS global/default search until accepted into the default catalog.
-- Add the repository URL manually via **Custom repositories** and then search/install in HACS.
+1. HACS -> Integrations -> three-dot menu -> Custom repositories.
+2. Add `https://github.com/Jerry0022/homeassistant-lightcompanion` as category **Integration**.
+3. Download **Light Companion** and restart Home Assistant.
+4. Settings -> Devices & services -> Add integration -> **Light Companion**.
 
-### Do I need HACS?
-- HACS is only an **installation channel** for this custom integration.
-- The runtime setup is always done via Home Assistant: **Settings → Devices & Services → Add Integration → Light Companion**.
+## Setup
 
-### Installation without HACS (manual)
-1. Copy `custom_components/lightcompanion` to your HA config directory at `config/custom_components/lightcompanion`.
-2. Restart Home Assistant.
-3. Open **Settings → Devices & Services → Add Integration** and add **Light Companion**.
+Pick exactly one AI provider. All options (rate limits, excluded lights, default area, ...) are in the
+integration's **Configure** dialog; on desktop the card also has a settings button.
 
-### Why it is not listed directly in Home Assistant integrations
-- Home Assistant's built-in integration catalog lists integrations shipped with HA Core.
-- Light Companion is a **custom integration**, so HA can only list it after you install its files (via HACS or manual copy).
-- This repository can be added as a custom repository in HACS, but appearing in the global default HACS catalog requires separate HACS review/acceptance.
+| Provider | API key |
+|---|---|
+| Home Assistant AI Task (default) | no, uses your `ai_task` entity |
+| Conversation agent | no, uses the selected agent |
+| OpenAI, Anthropic, Google Gemini | yes, stored in the config entry |
 
-## Configuration
-Supported providers (one active provider at a time):
-- `openai`
-- `anthropic`
-- `google`
+## Card
 
-Required provider settings:
-- `api_key`
-- `model` (switchable in the panel)
-- `base_url`
+```yaml
+type: custom:lightcompanion-card
+area: living_room
+```
 
-For OpenAI, this integration is intended to work with your existing Home Assistant OpenAI integration setup (no separate external app server).
+The card is loaded automatically and shows up in the card picker. An optional sidebar panel
+("Show sidebar panel" option) is hidden by default.
 
+Services: `lightcompanion.chat` (returns the reply and the applied plan) and `lightcompanion.stop`.
 
-## Updating
-### Custom integration (HACS)
-1. Open HACS → **Integrations** → **Light Companion**.
-2. Click **Update** when a newer version is available.
-3. Restart Home Assistant after update.
+## Safety
 
-### Add-on repository
-1. Open **Settings → Add-ons → Add-on Store**.
-2. Refresh repositories (3-dot menu → **Check for updates**).
-3. Open **Light Companion App** and install/update to the newest version.
+- The AI answer must be strict JSON and is validated before anything is executed; invalid output never
+  reaches a light service.
+- One AI call per chat command or per new track, never per beat. Default limit: 50 calls per hour.
+- Light commands are rate-limited per transport (default 4 per second overall).
+- Strobe is off by default and only allowed in party mode when explicitly enabled.
+- Lights containing "aquarium" or "terrarium" in name or area are excluded by default.
 
-## Usage
-- Open the **Light Companion** sidebar panel.
-- Enter a command such as “Set living room lights to warm white at 40%”.
-- The integration validates strict JSON action output before running light service calls.
+## Coexisting with your light automations
 
-## Notes
-- The integration only targets entities in the `light` domain.
-- Keep API keys in config entry options; never hardcode secrets.
+- Every area with an active effect gets a switch (`switch.lightcompanion_<area>_effect`); turn it off to
+  stop the effect and restore the lights.
+- **Blocking entities** (input_boolean, switch or binary_sensor, e.g. a cleaning or sleep mode): while one
+  is on, effects are refused or stopped.
+- External changes (a scene, script or the user) make the effect release that light; it is not touched again.
+- Adaptive Lighting manual control is set on the affected lights during effects, so it does not fight back.
+
+Lights with the label `lightcompanion_exclude` (configurable) are never touched.
+
+## Development
+
+```
+pip install -r requirements_test.txt
+pytest
+ruff check custom_components tests scripts
+python scripts/bump_versions.py --check
+```

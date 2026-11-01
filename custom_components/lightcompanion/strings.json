@@ -3,16 +3,94 @@
     "step": {
       "user": {
         "title": "Light Companion",
-        "description": "Light Companion uses any supported Home Assistant conversation agent (OpenAI, Anthropic, Google, Ollama) for LLM access."
+        "description": "Choose the single AI provider that turns your chat into light plans.",
+        "data": { "llm_provider": "AI provider" }
+      },
+      "ai_task": {
+        "title": "AI Task",
+        "description": "Optionally pick an AI Task entity. Leave empty to use the default one.",
+        "data": { "ai_task_entity": "AI Task entity" }
+      },
+      "conversation": {
+        "title": "Conversation agent",
+        "data": { "conversation_agent": "Conversation agent" }
+      },
+      "api": {
+        "title": "API access",
+        "description": "Enter the API key for {provider}. It is stored in the config entry and never shown again.",
+        "data": { "api_key": "API key", "model": "Model" }
       }
     },
-    "abort": {
-      "missing_llm": "No supported conversation agent integration was found. Set up at least one (OpenAI Conversation, Anthropic, Google Generative AI, or Ollama) under Settings > Devices & Services, then retry Light Companion.",
-      "missing_openai": "No supported conversation agent integration was found."
+    "error": { "api_key_required": "An API key is required for this provider." },
+    "abort": { "single_instance_allowed": "Light Companion is already configured." }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Light Companion options",
+        "description": "Exactly one AI provider is active. Leave the API key empty to keep the stored key.",
+        "data": {
+          "llm_provider": "AI provider",
+          "ai_task_entity": "AI Task entity (ai_task)",
+          "conversation_agent": "Conversation agent (conversation)",
+          "api_key": "API key (OpenAI, Anthropic, Google)",
+          "model": "Model (OpenAI, Anthropic, Google)",
+          "ai_calls_per_hour": "AI calls per hour",
+          "light_rate": "Light commands per second",
+          "allow_strobe": "Allow strobe in party mode",
+          "excluded_lights": "Excluded lights",
+          "exclude_keywords": "Exclude keywords (name or area)",
+          "exclude_label": "Exclude label",
+          "blocking_entities": "Blocking entities (effects stop while one is on)",
+          "default_area": "Default area",
+          "show_panel": "Show sidebar panel"
+        },
+        "data_description": {
+          "exclude_label": "Lights carrying this label are never touched.",
+          "blocking_entities": "For example a cleaning or sleep mode switch."
+        }
+      }
+    },
+    "error": {
+      "api_key_required": "An API key is required for this provider.",
+      "invalid_options": "The options are invalid."
     }
   },
-  "panel": {
-    "openai_missing": "No LLM integration is available.",
-    "open_integrations_cta": "Open Integrations"
+  "selector": {
+    "llm_provider": {
+      "options": {
+        "ai_task": "Home Assistant AI Task",
+        "conversation": "Conversation agent",
+        "openai": "OpenAI (own key)",
+        "anthropic": "Anthropic (own key)",
+        "google": "Google Gemini (own key)"
+      }
+    }
+  },
+  "services": {
+    "chat": {
+      "name": "Chat",
+      "description": "Send a lighting request for an area and get the reply and applied plan back.",
+      "fields": {
+        "area_id": { "name": "Area", "description": "Area whose lights are controlled." },
+        "text": { "name": "Text", "description": "What the lights should do." },
+        "language": { "name": "Language", "description": "Language of the reply." }
+      }
+    },
+    "stop": {
+      "name": "Stop",
+      "description": "Stop the effect in an area and restore its lights.",
+      "fields": {
+        "area_id": { "name": "Area", "description": "Area to stop." }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": { "message": "Light Companion is not loaded." }
+  },
+  "entity": {
+    "switch": {
+      "effect": { "name": "{area} effect" }
+    }
   }
 }
