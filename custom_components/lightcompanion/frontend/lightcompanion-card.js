@@ -1230,8 +1230,25 @@ class LightCompanionCardEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LightCompanionCard);
-if (!customElements.get(EDITOR_TAG)) customElements.define(EDITOR_TAG, LightCompanionCardEditor);
+function registerElements() {
+  if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LightCompanionCard);
+  if (!customElements.get(EDITOR_TAG)) customElements.define(EDITOR_TAG, LightCompanionCardEditor);
+}
+
+registerElements();
+
+// This module loads early (extra_js_url). On mobile HA swaps window.customElements for a
+// scoped-registry polyfill afterwards, which does not see the define above, so Lovelace shows
+// "Custom element doesn't exist". Re-register while the frontend boots.
+const REGISTER_WATCH_MS = 30000;
+const registerWatch = setInterval(() => {
+  try {
+    registerElements();
+  } catch (err) {
+    console.warn("Light Companion: card registration failed", err);
+  }
+}, 250);
+setTimeout(() => clearInterval(registerWatch), REGISTER_WATCH_MS);
 
 window.customCards = window.customCards || [];
 if (!window.customCards.some((c) => c.type === CARD_TAG)) {
