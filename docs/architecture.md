@@ -436,3 +436,16 @@ cleaning mode, presence sensors, Hue groups, aquarium lights); all generic.
 * Bus events: `lightcompanion_effect_started|stopped|skipped`
   (`area_id`, `pattern`, `source`, `reason`).
 * Planner maps `EffectBlockedError` to `ChatResult.error == "blocked"`.
+
+## Addendum B — pinned after wave 1
+
+* `Planner.async_add_listener(cb) -> CALLBACK_TYPE` exists; `lightcompanion/subscribe`
+  uses it (plus a 10 s refresh fallback).
+* `Planner.status()` → `{"ai": {"used", "limit"}, "follow": {area_id: {"track":
+  {"title","artist","album","uri","image_url","is_playing"} | null, "profile":
+  {"genre","mood","energy","tempo_class","bpm","bpm_source"} | null, "error": str | null}}}`.
+* `plan.normalize_raw_plan(raw)` runs before `validate_plan` (hex palette →
+  RGB, JSON-stringified lists); `validate_plan` itself stays strict.
+* BPM chain in `music.py`: Music Assistant `music/tracks/get` →
+  `audio_metadata.bpm` (re-polled while missing) → ReccoBeats by ISRC →
+  Deezer `track/isrc:`; never LLM-guessed.

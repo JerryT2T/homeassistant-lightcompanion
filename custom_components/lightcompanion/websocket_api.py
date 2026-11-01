@@ -237,11 +237,16 @@ def ws_subscribe(
         )
 
     unsub_engine = data.engine.async_add_listener(_push)
+    # Planner pushes follow/budget changes directly; the timer stays as a fallback.
+    add_planner_listener = getattr(data.planner, "async_add_listener", None)
+    unsub_planner = add_planner_listener(_push) if add_planner_listener else None
     unsub_timer = async_track_time_interval(hass, _push, SUBSCRIBE_REFRESH)
 
     @callback
     def _unsub() -> None:
         unsub_engine()
+        if unsub_planner:
+            unsub_planner()
         unsub_timer()
 
     connection.subscriptions[msg_id] = _unsub
