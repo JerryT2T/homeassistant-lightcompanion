@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Light Companion card preview</title>
+<!--
+  Dev harness: mocks hass + hass.connection so the card runs without Home Assistant.
+  Serve the repo root (python -m http.server) and open /docs/card-preview.html.
+  Query: ?dark=1  ?lang=de  ?admin=0  ?narrow=1  ?panel=1
+-->
+<style>
+  :root {
+    --primary-color: #03a9f4; --text-primary-color: #fff; --primary-text-color: #212121; --secondary-text-color: #727272;
+    --card-background-color: #fff; --secondary-background-color: #e5e5e5; --primary-background-color: #fafafa;
+    --divider-color: rgba(0,0,0,.12); --ha-card-border-radius: 12px; --error-color: #db4437; --warning-color: #ffa600;
+  }
+  :root.dark {
+    --primary-text-color: #e1e1e1; --secondary-text-color: #9b9b9b; --card-background-color: #1c1c1c;
+    --secondary-background-color: #2b2b2b; --primary-background-color: #111; --divider-color: rgba(225,225,225,.12);
+  }
+  body { margin: 0; font-family: Roboto, system-ui, sans-serif; background: var(--primary-background-color); color: var(--primary-text-color); }
+  ha-card { display: block; background: var(--card-background-color); border-radius: var(--ha-card-border-radius); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+  #bar { padding: 8px 12px; display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px; border-bottom: 1px solid var(--divider-color); }
+  #bar button { padding: 4px 10px; }
+  #host { max-width: 760px; margin: 12px auto; height: 640px; padding: 0 8px; }
+  lightcompanion-card { height: 100%; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <button id="dark">Toggle dark</button>
+  <button id="push">Fake music effect</button>
+  <button id="clear">Stop effect</button>
+  <button id="offline">Toggle not-loaded</button>
+</div>
+<div id="host"></div>
+<script type="module">
+const q = new URLSearchParams(location.search);
+if (q.get("dark")) document.documentElement.classList.add("dark");
+document.getElementById("dark").onclick = () => document.documentElement.classList.toggle("dark");
+
+const states = {};
+const setLight = (id, name, on, extra = {}) => {
+  states[id] = { entity_id: id, state: on ? "on" : "off", attributes: { friendly_name: name, brightness: on ? 200 : null, ...extra } };
+};
+setLight("light.sofa", "Sofa lamp", true, { rgb_color: [255, 120, 40], brightness: 220 });
+setLight("light.strip", "TV strip", true, { rgb_color: [120, 40, 255], brightness: 150 });
+setLight("light.ceiling", "Ceiling", true, { color_temp_kelvin: 2700, brightness: 120 });
+setLight("light.bed", "Bedside", false);
+setLight("light.aqua", "Aquarium light", true, { color_temp_kelvin: 6500 });
+states["media_player.living"] = { entity_id: "media_player.living", state: "playing", attributes: { friendly_name: "Living room speaker" } };
+states["ai_task.default"] = { entity_id: "ai_task.default", state: "unknown", attributes: { friendly_name: "AI Task" } };
+const lightInfo = (id, name, excluded = false) => ({ entity_id: id, name, excluded });
+const areas = [
+  { area_id: "living", name: "Living room", lights: [lightInfo("light.sofa", "Sofa lamp"), lightInfo("light.strip", "TV strip"), lightInfo("light.ceiling", "Ceiling"), lightInfo("light.aqua", "Aquarium light", true)], player: "media_player.living" },
+  { area_id: "bedroom", name: "Bedroom", lights: [lightInfo("light.bed", "Bedside")], player: null },
+  { area_id: "kitchen", name: "Kitchen", lights: [lightInfo("light.bed", "Bedside")] },
+  { area_id: "office", name: "Office", lights: [lightInfo("light.bed", "Bedside")] },
+  { area_id: "hall", name: "Hallway", lights: [lightInfo("light.bed", "Bedside")] },
+];
+
+let settings = { llm_provider: "ai_task", ai_task_entity: null, conversation_agent: null, model: null, has_api_key: true, ai_calls_per_hour: 50, light_rate: 4, allow_strobe: false, excluded_lights: [], exclude_keywords: ["aquarium", "terrarium"], player_overrides: {}, default_area: null, show_panel: false };
+let subCb = null;
+let engine = {};
+let used = 7;
+let offline = false;
+const push = () => subCb && subCb({ engine, planner: { ai: { used, limit: settings.ai_calls_per_hour }, follow: { living: { title: "Midnight City — M83" } } } });
+document.getElementById("push").onclick = () => { engine.living = { active: true, pattern: "pulse", source: "music", palette: [] }; push(); };
+document.getElementById("clear").onclick = () => { engine = {}; push(); };
+document.getElementById("offline").onclick = () => { offline = !offline; card.hass = makeHass(); };
+
+const notLoaded = () => Object.assign(new Error("not loaded"), { code: "not_loaded" });
+const hass = {
+  states,
+  locale: { language: q.get("lang") || "en" },
+  language: q.get("lang") || "en",
+  connection: {
+    socket: { send: (d) => console.log("socket.send", d.length) },
+    subscribeMessage: async (cb, msg) => {
+      if (msg.type === "lightcompanion/subscribe") {
+        if (offline) throw notLoaded();
+        subCb = cb; setTimeout(push, 50);
+        return () => { subCb = null; };
+      }
+      if (msg.type === "assist_pipeline/run") {
+        setTimeout(() => cb({ type: "run-start", data: { runner_data: { stt_binary_handler_id: 1 } } }), 100);
+        setTimeout(() => cb({ type: "stt-vad-end", data: {} }), 1800);
+        setTimeout(() => cb({ type: "stt-end", data: { stt_output: { text: "Make it a calm sunset" } } }), 2000);
+        setTimeout(() => cb({ type: "run-end", data: {} }), 2100);
+        return () => {};
+      }
+      throw new Error("unsupported");
+    },
+  },
+  callWS: async (msg) => {
+    await new Promise((r) => setTimeout(r, 300));
+    if (offline) throw notLoaded();
+    switch (msg.type) {
+      case "lightcompanion/areas": return { areas };
+      case "lightcompanion/settings/get":
+        return { settings, is_admin: q.get("admin") !== "0", providers: ["ai_task", "conversation", "openai", "anthropic", "google"],
+          light_candidates: [{ entity_id: "light.sofa", name: "Sofa lamp", area: "Living room" }, { entity_id: "light.strip", name: "TV strip", area: "Living room" }, { entity_id: "light.aqua", name: "Aquarium light", area: "Living room" }, { entity_id: "light.bed", name: "Bedside", area: "Bedroom" }] };
+      case "lightcompanion/settings/set": settings = { ...settings, ...msg.options }; console.log("settings/set", JSON.stringify(msg.options)); return { settings };
+      case "lightcompanion/stop": engine = {}; push(); return {};
+      case "lightcompanion/chat": {
+        used++;
+        if (/limit/i.test(msg.text)) return { reply: "", applied: false, plan: null, error: "rate_limited" };
+        if (/off/i.test(msg.text)) {
+          for (const id of ["light.sofa", "light.strip", "light.ceiling"]) setLight(id, states[id].attributes.friendly_name, false);
+          card.hass = makeHass(); return { reply: "Lights off.", applied: true, plan: {}, error: null };
+        }
+        setLight("light.sofa", "Sofa lamp", true, { rgb_color: [20, 60, 200], brightness: 180 });
+        setLight("light.strip", "TV strip", true, { rgb_color: [200, 30, 120], brightness: 160 });
+        setLight("light.ceiling", "Ceiling", true, { rgb_color: [40, 20, 90], brightness: 90 });
+        engine[msg.area_id] = { active: true, pattern: "wave", source: "chat", palette: [] };
+        card.hass = makeHass(); push();
+        return { reply: `Done — a dark, moody wave for "${msg.text}".`, applied: true, plan: {}, error: null };
+      }
+    }
+    throw Object.assign(new Error("unknown"), { code: "unknown_command" });
+  },
+};
+const makeHass = () => ({ ...hass, states: { ...states } });
+
+let card;
+async function boot() {
+  await import("../custom_components/lightcompanion/frontend/lightcompanion-card.js");
+  if (q.get("panel")) {
+    await import("../custom_components/lightcompanion/frontend/lightcompanion-panel.js");
+    card = document.createElement("lightcompanion-panel");
+    card.narrow = q.get("narrow") === "1";
+  } else {
+    card = document.createElement("lightcompanion-card");
+    card.setConfig({ type: "custom:lightcompanion-card" });
+    if (q.get("narrow") === "1") card.narrow = true;
+  }
+  document.getElementById("host").append(card);
+  card.hass = makeHass();
+}
+boot();
+</script>
+</body>
+</html>
