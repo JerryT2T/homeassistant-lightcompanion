@@ -11,6 +11,7 @@ from homeassistant.exceptions import Unauthorized
 from homeassistant.helpers import area_registry as ar
 
 from custom_components.lightcompanion import websocket_api as ws
+from custom_components.lightcompanion.engine import EffectBlockedError
 
 PKG = "custom_components.lightcompanion"
 
@@ -73,10 +74,6 @@ async def test_chat_and_unknown_area(hass: HomeAssistant, entry, mock_runtime) -
 async def test_chat_blocked(hass: HomeAssistant, entry, mock_runtime) -> None:
     await _loaded(hass, entry, mock_runtime)
     area = ar.async_get(hass).async_create("Living")
-
-    class EffectBlockedError(Exception):
-        pass
-
     mock_runtime.planner.async_chat = AsyncMock(side_effect=EffectBlockedError("input_boolean.x"))
     conn = _conn()
     ws.ws_chat(hass, conn, {"id": 1, "area_id": area.id, "text": "hi"})

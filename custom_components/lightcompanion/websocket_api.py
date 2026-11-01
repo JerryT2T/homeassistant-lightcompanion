@@ -25,6 +25,7 @@ from .const import (
     KEY_PROVIDERS,
     LLM_PROVIDERS,
 )
+from .engine import EffectBlockedError
 from .lights import async_list_areas
 from .settings import Settings, validate_options
 
@@ -138,10 +139,10 @@ async def ws_chat(
         result = await entry.runtime_data.planner.async_chat(
             msg["area_id"], msg["text"], msg.get("language")
         )
-    except Exception as err:
-        if type(err).__name__ == "EffectBlockedError":
-            connection.send_error(msg["id"], "blocked", str(err))
-            return
+    except EffectBlockedError as err:
+        connection.send_error(msg["id"], "blocked", str(err))
+        return
+    except Exception:
         _LOGGER.exception("Chat failed")
         connection.send_error(msg["id"], "chat_failed", "Chat failed, see the log")
         return

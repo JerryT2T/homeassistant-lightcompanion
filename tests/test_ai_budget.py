@@ -6,7 +6,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from ai_helpers import imp  # noqa: E402
+from ai_helpers import imp
 
 AiBudget = imp("ai_budget").AiBudget
 

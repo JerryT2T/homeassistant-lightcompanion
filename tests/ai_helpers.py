@@ -28,16 +28,37 @@ def _mod(name: str, **attrs: Any) -> types.ModuleType:
     return module
 
 
+def _route_fake_sessions() -> None:
+    """With real HA installed, hand FakeHass its own session instead of HA's."""
+    helper = importlib.import_module("homeassistant.helpers.aiohttp_client")
+    original = helper.async_get_clientsession
+    if getattr(original, "_lc_fake_aware", False):
+        return
+
+    def async_get_clientsession(hass: Any, *args: Any, **kwargs: Any) -> Any:
+        if isinstance(hass, FakeHass):
+            return hass.session
+        return original(hass, *args, **kwargs)
+
+    async_get_clientsession._lc_fake_aware = True  # type: ignore[attr-defined]
+    helper.async_get_clientsession = async_get_clientsession
+    http_mod = sys.modules.get(f"{PKG}.llm.http")
+    if http_mod is not None:
+        http_mod.async_get_clientsession = async_get_clientsession
+
+
 def install() -> None:
-    global FAKE_HA  # noqa: PLW0603
+    global FAKE_HA
     if PKG in sys.modules or FAKE_HA:
         return
     sys.path.insert(0, str(ROOT))
     try:
         importlib.import_module("homeassistant.core")
-        return
     except ImportError:
         pass
+    else:
+        _route_fake_sessions()
+        return
     FAKE_HA = True
 
     class HomeAssistantError(Exception):

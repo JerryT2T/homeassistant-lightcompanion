@@ -171,7 +171,7 @@ def _profile_block(
     return "\n".join(parts)
 
 
-def build_chat_instructions(
+def build_chat_instructions(  # noqa: PLR0913 - keyword-only prompt inputs
     *,
     area_name: str,
     lights: Sequence[LightInfo],
@@ -207,7 +207,7 @@ def build_chat_instructions(
     return "\n\n".join(parts)
 
 
-def build_music_instructions(
+def build_music_instructions(  # noqa: PLR0913 - keyword-only prompt inputs
     *,
     area_name: str,
     lights: Sequence[LightInfo],

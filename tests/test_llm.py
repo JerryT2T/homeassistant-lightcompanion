@@ -9,7 +9,7 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
-from ai_helpers import FakeHass, FakeLight, FakeServices, imp, make_settings  # noqa: E402
+from ai_helpers import FakeHass, FakeLight, FakeServices, imp, make_settings
 
 base = imp("llm.base")
 http = imp("llm.http")
@@ -238,7 +238,7 @@ def test_http_providers(provider, body, url_part, header):
 
 
 def test_openai_json_mode_and_default_model():
-    _, headers, body = http.build_request("openai", "m", "k", "sys", "usr")
+    _, _headers, body = http.build_request("openai", "m", "k", "sys", "usr")
     assert body["response_format"] == {"type": "json_object"}
     client, session = http_client("openai", FakeResp(200, OPENAI_OK))
     gen(client)
@@ -292,7 +292,7 @@ def test_http_client_error_does_not_leak_key():
     assert "sk-secret" not in str(exc.value)
 
 
-# --- factory ---------------------------------------------------------------------------------------
+# --- factory ---
 
 
 @pytest.mark.parametrize(
@@ -347,7 +347,7 @@ def test_fallback_client(code, falls_back):
         assert fallback.n == 0
 
 
-# --- prompt ----------------------------------------------------------------------------------------------
+# --- prompt ---
 
 
 def test_prompt_contains_only_non_excluded_lights_with_capabilities():

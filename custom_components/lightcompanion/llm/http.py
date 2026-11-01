@@ -122,7 +122,7 @@ class HttpClient:
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_S),
             ) as resp:
-                if resp.status != 200:  # noqa: PLR2004
+                if resp.status != 200:
                     _LOGGER.warning(
                         "%s answered HTTP %s for %s", self._provider, resp.status, task_name
                     )

@@ -142,10 +142,10 @@ def pick_palette(counted: list[tuple[int, Color]], limit: int = 5) -> tuple[Colo
     ordered = [c for _, c in sorted(counted, key=lambda p: -p[0])]
 
     def vivid(c: Color) -> bool:
-        return max(c) >= 60 and max(c) - min(c) >= 25  # noqa: PLR2004
+        return max(c) >= 60 and max(c) - min(c) >= 25
 
     def usable(c: Color) -> bool:
-        return max(c) >= 40  # noqa: PLR2004
+        return max(c) >= 40
 
     chosen: list[Color] = []
     for pool in (
@@ -166,7 +166,7 @@ def pick_palette(counted: list[tuple[int, Color]], limit: int = 5) -> tuple[Colo
 def dominant_colors(data: bytes, limit: int = 5) -> tuple[Color, ...]:
     """Up to ``limit`` dominant colors of an image (Pillow, imported lazily)."""
     try:
-        from PIL import Image  # noqa: PLC0415
+        from PIL import Image
     except ImportError:
         _LOGGER.debug("Pillow not available, no cover palette")
         return ()
@@ -179,7 +179,7 @@ def dominant_colors(data: bytes, limit: int = 5) -> tuple[Color, ...]:
             counts = quant.getcolors() or []
         counted = [(n, (palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2])) for n, i in counts]
         return pick_palette(counted, limit)
-    except Exception:  # noqa: BLE001 - broken image must never break a chat
+    except Exception:
         _LOGGER.debug("Cover image could not be decoded", exc_info=True)
         return ()
 
@@ -198,7 +198,7 @@ def normalize_envelope(values: Any) -> list[float] | None:
             for i in range(ENVELOPE_POINTS)
         ]
     lo, hi = min(nums), max(nums)
-    if hi - lo < 1e-9:  # noqa: PLR2004
+    if hi - lo < 1e-9:
         return None
     return [(v - lo) / (hi - lo) for v in nums]
 
@@ -227,7 +227,7 @@ def _norm(text: str) -> str:
 
 def _find_bpm(data: Any, depth: int = 0) -> float | None:
     """Look for a bpm/tempo number in a (nested) MA item dict."""
-    if depth > 3 or not isinstance(data, dict):  # noqa: PLR2004
+    if depth > 3 or not isinstance(data, dict):
         return None
     for key, value in data.items():
         if isinstance(key, str) and key.lower() in ("bpm", "tempo"):
@@ -266,7 +266,7 @@ def _isrc_from(raw: Any) -> str | None:
     """ISRC out of MA ``external_ids``: list of ``[type, value]`` pairs."""
     ids = raw.get("external_ids") if isinstance(raw, dict) else None
     for pair in ids or []:
-        if isinstance(pair, (list, tuple)) and len(pair) == 2 and str(pair[0]).lower() == "isrc":  # noqa: PLR2004
+        if isinstance(pair, (list, tuple)) and len(pair) == 2 and str(pair[0]).lower() == "isrc":
             value = str(pair[1]).strip().upper()
             if value:
                 return value
@@ -303,8 +303,8 @@ async def _reccobeats_bpm(service: MusicService, track: TrackInfo) -> float | No
     isrc = service.isrc_cache.get(track.uri or "")
     if not isrc or time.monotonic() < service.reccobeats_blocked_until:
         return None
-    import aiohttp  # noqa: PLC0415
-    from homeassistant.helpers.aiohttp_client import async_get_clientsession  # noqa: PLC0415
+    import aiohttp
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
     session = async_get_clientsession(service.hass)
     try:
@@ -313,7 +313,7 @@ async def _reccobeats_bpm(service: MusicService, track: TrackInfo) -> float | No
             params={"ids": isrc},
             timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT_S),
         ) as resp:
-            if resp.status != 200:  # noqa: PLR2004
+            if resp.status != 200:
                 service.reccobeats_blocked_until = time.monotonic() + BACKOFF_S
                 return None
             body = await resp.json(content_type=None)
@@ -335,15 +335,15 @@ async def _reccobeats_bpm(service: MusicService, track: TrackInfo) -> float | No
 
 
 async def _deezer_bpm(service: MusicService, track: TrackInfo) -> float | None:
-    import aiohttp  # noqa: PLC0415
-    from homeassistant.helpers.aiohttp_client import async_get_clientsession  # noqa: PLC0415
+    import aiohttp
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
     session = async_get_clientsession(service.hass)
     timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT_S)
     isrc = service.isrc_cache.get(track.uri or "")
     if isrc:
         async with session.get(DEEZER_ISRC.format(isrc=isrc), timeout=timeout) as resp:
-            if resp.status == 200:  # noqa: PLR2004
+            if resp.status == 200:
                 detail = await resp.json(content_type=None)
                 found = valid_bpm((detail or {}).get("bpm"))
                 if found:
@@ -354,7 +354,7 @@ async def _deezer_bpm(service: MusicService, track: TrackInfo) -> float | None:
         track.artist.replace('"', " "), track.title.replace('"', " ")
     )
     async with session.get(DEEZER_SEARCH, params={"q": query, "limit": 3}, timeout=timeout) as resp:
-        if resp.status != 200:  # noqa: PLR2004
+        if resp.status != 200:
             return None
         found_items = await resp.json(content_type=None)
     wanted = _norm(track.title)
@@ -367,7 +367,7 @@ async def _deezer_bpm(service: MusicService, track: TrackInfo) -> float | None:
     if track_id is None:
         return None
     async with session.get(DEEZER_TRACK.format(id=track_id), timeout=timeout) as resp:
-        if resp.status != 200:  # noqa: PLR2004
+        if resp.status != 200:
             return None
         detail = await resp.json(content_type=None)
     return valid_bpm((detail or {}).get("bpm"))
@@ -401,7 +401,7 @@ class MusicService:
 
     def _ma_players(self) -> list[tuple[str, str | None]]:
         """``(entity_id, area_id)`` of all Music Assistant media players."""
-        from homeassistant.helpers import (  # noqa: PLC0415
+        from homeassistant.helpers import (
             device_registry as dr,
         )
         from homeassistant.helpers import (
@@ -448,7 +448,7 @@ class MusicService:
     def _absolute_url(self, image_url: str) -> str | None:
         if image_url.startswith(("http://", "https://")):
             return image_url
-        from homeassistant.helpers.network import NoURLAvailableError, get_url  # noqa: PLC0415
+        from homeassistant.helpers.network import NoURLAvailableError, get_url
 
         try:
             base = get_url(self.hass, prefer_external=False, allow_external=True)
@@ -460,15 +460,15 @@ class MusicService:
         if not track.image_url:
             return ()
         try:
-            import PIL  # noqa: F401, PLC0415
+            import PIL  # noqa: F401
         except ImportError:
             return ()
         url = self._absolute_url(track.image_url)
         if url is None:
             return ()
         try:
-            import aiohttp  # noqa: PLC0415
-            from homeassistant.helpers.aiohttp_client import (  # noqa: PLC0415
+            import aiohttp
+            from homeassistant.helpers.aiohttp_client import (
                 async_get_clientsession,
             )
 
@@ -476,11 +476,11 @@ class MusicService:
             async with session.get(
                 url, timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT_S)
             ) as resp:
-                if resp.status != 200:  # noqa: PLR2004
+                if resp.status != 200:
                     return ()
                 data = await resp.content.read(MAX_IMAGE_BYTES)
             return await self.hass.async_add_executor_job(dominant_colors, data, 5)
-        except Exception:  # noqa: BLE001 - cover art is optional
+        except Exception:
             _LOGGER.debug("Cover palette unavailable", exc_info=True)
             return ()
 
@@ -496,7 +496,7 @@ class MusicService:
                 mass = getattr(getattr(entry, "runtime_data", None), "mass", None)
                 if mass is not None:
                     return mass
-        except Exception:  # noqa: BLE001
+        except Exception:
             _LOGGER.debug("Music Assistant client lookup failed", exc_info=True)
         return None
 
@@ -509,7 +509,7 @@ class MusicService:
         try:
             async with asyncio.timeout(MA_COMMAND_TIMEOUT_S):
                 return await send(command, **args)
-        except Exception:  # noqa: BLE001
+        except Exception:
             _LOGGER.debug("Music Assistant command %s failed", command, exc_info=True)
             return None
 
@@ -540,7 +540,7 @@ class MusicService:
             if queue_id:
                 media = mass.player_queues.get(queue_id).current_item.media_item
                 item_id, provider = media.item_id, media.provider
-        except Exception:  # noqa: BLE001
+        except Exception:
             _LOGGER.debug("MA queue lookup failed", exc_info=True)
         if not item_id and track.uri:
             found = await self.async_ma_command("music/item_by_uri", uri=track.uri)
@@ -571,7 +571,7 @@ class MusicService:
                     return
         except asyncio.CancelledError:
             raise
-        except Exception:  # noqa: BLE001
+        except Exception:
             _LOGGER.debug("MA bpm re-poll failed", exc_info=True)
 
     @staticmethod
@@ -602,7 +602,7 @@ class MusicService:
             try:
                 async with asyncio.timeout(HTTP_TIMEOUT_S + 2):
                     value = await source(self, track)
-            except Exception:  # noqa: BLE001 - a source may fail, the next may not
+            except Exception:
                 _LOGGER.debug("BPM source %s failed", name, exc_info=True)
                 continue
             bpm = valid_bpm(value)
@@ -621,8 +621,8 @@ class MusicService:
         player = self.player_for_area(area_id)
         if player is None:
             return lambda: None
-        from homeassistant.core import callback  # noqa: PLC0415
-        from homeassistant.helpers.event import async_track_state_change_event  # noqa: PLC0415
+        from homeassistant.core import callback
+        from homeassistant.helpers.event import async_track_state_change_event
 
         last: list[Any] = [object()]
 

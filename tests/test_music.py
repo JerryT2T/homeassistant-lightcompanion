@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
-from ai_helpers import FakeHass, FakeState, imp, make_settings  # noqa: E402
+from ai_helpers import FakeHass, FakeState, imp, make_settings
 
 music = imp("music")
 
@@ -105,7 +105,7 @@ def test_dominant_colors_real_image():
     assert any(c[0] > 150 for c in pal) and any(c[2] > 150 for c in pal)
 
 
-# --- helpers ----------------------------------------------------------------------------------
+# --- helpers ---
 
 
 def test_split_uri():
@@ -144,7 +144,7 @@ def test_profile_cache_lru():
     assert len(cache) == 2
 
 
-# --- service -------------------------------------------------------------------------------------
+# --- service ---
 
 
 def service(**settings):
@@ -425,7 +425,7 @@ def test_energy_envelope_none_cases():
     assert run(svc.async_energy_envelope(make_track(uri=None))) is None
 
 
-# --- Deezer ---------------------------------------------------------------------------------------------
+# --- Deezer ---
 
 
 class DeezerResp:

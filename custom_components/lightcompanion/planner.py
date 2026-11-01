@@ -50,7 +50,10 @@ TEMPO_CLASSES = ("slow", "medium", "fast")
 _REPLIES: dict[str, dict[str, str]] = {
     "rate_limited": {
         "en": "I have used up my AI calls for this hour. The current lights stay as they are.",
-        "de": "Mein KI-Kontingent für diese Stunde ist aufgebraucht. Das aktuelle Licht bleibt, wie es ist.",
+        "de": (
+            "Mein KI-Kontingent für diese Stunde ist aufgebraucht. "
+            "Das aktuelle Licht bleibt, wie es ist."
+        ),
     },
     "no_lights": {
         "en": "This room has no lights I may control.",
@@ -78,18 +81,18 @@ def _msg(key: str, language: str | None, **kwargs: str) -> str:
 
 
 def _area_lights(hass: HomeAssistant, area_id: str, settings: Settings) -> list[LightInfo]:
-    from .lights import async_area_lights  # noqa: PLC0415
+    from .lights import async_area_lights
 
     return async_area_lights(hass, area_id, settings)
 
 
 def _area_name(hass: HomeAssistant, area_id: str) -> str:
     try:
-        from homeassistant.helpers import area_registry as ar  # noqa: PLC0415
+        from homeassistant.helpers import area_registry as ar
 
         area = ar.async_get(hass).async_get_area(area_id)
         return area.name if area else area_id
-    except Exception:  # noqa: BLE001
+    except Exception:
         return area_id
 
 
@@ -118,7 +121,7 @@ class _Follow:
 
 
 class Planner:
-    def __init__(
+    def __init__(  # noqa: PLR0913 - contract signature
         self,
         hass: HomeAssistant,
         settings: Settings,
@@ -170,7 +173,7 @@ class Planner:
         for cb in list(self._listeners):
             try:
                 cb()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.debug("planner listener failed", exc_info=True)
 
     # -- chat ------------------------------------------------------------------
@@ -303,7 +306,7 @@ class Planner:
                 await self._replan(area_id, track, follow)
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001 - background task must not crash HA
+            except Exception:
                 _LOGGER.exception("Music replan failed for %s", area_id)
             self._notify()
 

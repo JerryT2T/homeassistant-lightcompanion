@@ -9,7 +9,7 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
-from ai_helpers import FakeHass, FakeLight, FakeState, imp, make_settings  # noqa: E402
+from ai_helpers import FakeHass, FakeLight, FakeState, imp, make_settings
 
 planner_mod = imp("planner")
 music_mod = imp("music")
@@ -117,7 +117,7 @@ def test_chat_applies_valid_plan():
     res = run(p.async_chat("room", "cozy please", "en"))
     assert res.applied and res.error is None and res.reply == "Cozy!"
     assert res.plan["pattern"] == "breathe"
-    area, plan, ids, source = engine.applied[0]
+    area, _plan, ids, source = engine.applied[0]
     assert (area, ids, source) == ("room", ["light.a", "light.b"], "chat")
     assert "cozy please" in client.calls[0][1] and "Living Room" in client.calls[0][1]
 
@@ -214,7 +214,7 @@ def test_prompt_mentions_current_track():
     assert "Thunderstruck" in client.calls[0][1]
 
 
-# --- music follow -------------------------------------------------------------------------------------
+# --- music follow ---
 
 
 MUSIC_PLAN = {
@@ -257,7 +257,7 @@ def test_follow_subscribes_and_replans_on_new_track_with_last_instruction():
     assert "aber dunkle Farben" in instructions and "New Song" in instructions
     assert "Measured BPM: 120" in instructions and "#c81414" in instructions
     assert "music_genre" in schema
-    area, plan, _, source = engine.applied[-1]
+    _area, plan, _, source = engine.applied[-1]
     assert source == "music" and plan.follow_music and plan.pattern == "wave"
     prof = p.status()["follow"]["room"]["profile"]
     assert prof["genre"] == "rock" and prof["bpm"] == 120.0 and prof["bpm_source"] == "deezer"
@@ -281,7 +281,7 @@ def test_replayed_track_costs_no_llm_call():
 
 def test_second_track_with_known_profile_does_not_ask_for_profile():
     async def go():
-        p, hass, client, engine, mus = build({**GOOD, "follow_music": True}, MUSIC_PLAN)
+        p, hass, client, _engine, mus = build({**GOOD, "follow_music": True}, MUSIC_PLAN)
         await p.async_chat("room", "x", "en")
         mus.cb(track("u1"))
         await settle(hass)
@@ -315,7 +315,7 @@ def test_budget_exhausted_keeps_plan_and_reports():
 
 def test_invalid_music_plan_keeps_running_plan():
     async def go():
-        p, hass, client, engine, mus = build(
+        p, hass, _client, engine, mus = build(
             {**GOOD, "follow_music": True}, {"action": "apply", "palette": [[1, 2]]}
         )
         await p.async_chat("room", "x", "en")
@@ -330,7 +330,7 @@ def test_invalid_music_plan_keeps_running_plan():
 
 def test_music_llm_error_is_status_only():
     async def go():
-        p, hass, client, engine, mus = build({**GOOD, "follow_music": True}, LLMError("timeout"))
+        p, hass, client, _engine, mus = build({**GOOD, "follow_music": True}, LLMError("timeout"))
         await p.async_chat("room", "x", "en")
         client.responses = [LLMError("timeout")]
         mus.cb(track("u2"))
@@ -342,7 +342,7 @@ def test_music_llm_error_is_status_only():
 
 def test_music_replan_blocked_is_skipped_silently():
     async def go():
-        p, hass, client, engine, mus = build({**GOOD, "follow_music": True}, MUSIC_PLAN)
+        p, hass, _client, engine, mus = build({**GOOD, "follow_music": True}, MUSIC_PLAN)
         await p.async_chat("room", "x", "en")
         engine.error = EffectBlockedError("light.tv")
         mus.cb(track("u2"))
@@ -354,7 +354,7 @@ def test_music_replan_blocked_is_skipped_silently():
 
 def test_paused_or_missing_track_does_not_replan():
     async def go():
-        p, hass, client, engine, mus = build({**GOOD, "follow_music": True}, MUSIC_PLAN)
+        p, hass, client, _engine, mus = build({**GOOD, "follow_music": True}, MUSIC_PLAN)
         await p.async_chat("room", "x", "en")
         mus.cb(None)
         mus.cb(track("u3", playing=False))
@@ -366,7 +366,7 @@ def test_paused_or_missing_track_does_not_replan():
 
 def test_non_follow_chat_and_stop_unsubscribe():
     async def go():
-        p, hass, client, engine, mus = build(
+        p, _hass, _client, _engine, mus = build(
             {**GOOD, "follow_music": True},
             GOOD,
             {**GOOD, "follow_music": True},
@@ -387,7 +387,7 @@ def test_non_follow_chat_and_stop_unsubscribe():
 
 def test_async_stop_unsubscribes_all():
     async def go():
-        p, hass, client, engine, mus = build({**GOOD, "follow_music": True})
+        p, _hass, _client, _engine, mus = build({**GOOD, "follow_music": True})
         await p.async_chat("room", "x", "en")
         await p.async_stop()
         return p, mus
@@ -400,7 +400,7 @@ def test_status_is_json_serializable():
     import json
 
     async def go():
-        p, hass, client, engine, mus = build({**GOOD, "follow_music": True}, MUSIC_PLAN)
+        p, hass, _client, _engine, mus = build({**GOOD, "follow_music": True}, MUSIC_PLAN)
         mus.current = track("u1")
         await p.async_chat("room", "x", "en")
         mus.cb(track("u2"))

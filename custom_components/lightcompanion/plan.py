@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -77,7 +78,7 @@ def _is_number(value: Any) -> bool:
 
 def _as_int(value: Any, name: str) -> int:
     """Integral number (int or integral float) or error."""
-    if not _is_number(value) or value != value or value in (float("inf"), float("-inf")):
+    if not _is_number(value) or math.isnan(value) or value in (float("inf"), float("-inf")):
         raise PlanValidationError(f"{name} must be a number")
     if int(value) != value:
         raise PlanValidationError(f"{name} must be a whole number")
@@ -143,16 +144,18 @@ def _palette(raw: Mapping[str, Any]) -> tuple[tuple[int, int, int], ...]:
         raise PlanValidationError(f"palette has more than {MAX_PALETTE} colors")
     colors: list[tuple[int, int, int]] = []
     for color in value:
-        if not isinstance(color, (list, tuple)) or len(color) != 3:  # noqa: PLR2004
+        if not isinstance(color, (list, tuple)) or len(color) != 3:
             raise PlanValidationError("palette entries must be [r, g, b]")
         r, g, b = (_as_int(c, "palette channel") for c in color)
-        if not all(0 <= c <= 255 for c in (r, g, b)):  # noqa: PLR2004
+        if not all(0 <= c <= 255 for c in (r, g, b)):
             raise PlanValidationError("palette channel out of range 0..255")
         colors.append((r, g, b))
     return tuple(colors)
 
 
-def validate_plan(raw: Any, lights: Sequence[LightInfo], settings: Settings) -> LightPlan:
+def validate_plan(  # noqa: PLR0912, PLR0915 - one linear rule list, kept in one place
+    raw: Any, lights: Sequence[LightInfo], settings: Settings
+) -> LightPlan:
     """Return a safe :class:`LightPlan` or raise :class:`PlanValidationError`."""
     if not isinstance(raw, Mapping):
         raise PlanValidationError("plan must be a JSON object")
@@ -197,18 +200,18 @@ def validate_plan(raw: Any, lights: Sequence[LightInfo], settings: Settings) -> 
         raise PlanValidationError("apply needs a palette or color_temp_kelvin")
 
     brightness_raw = raw.get("brightness_pct", DEFAULT_BRIGHTNESS)
-    if not _is_number(brightness_raw) or brightness_raw != brightness_raw:
+    if not _is_number(brightness_raw) or math.isnan(brightness_raw):
         raise PlanValidationError("brightness_pct must be a number")
     brightness = max(1, min(100, round(brightness_raw)))
 
     transition_raw = raw.get("transition_s", DEFAULT_TRANSITION)
-    if not _is_number(transition_raw) or transition_raw != transition_raw:
+    if not _is_number(transition_raw) or math.isnan(transition_raw):
         raise PlanValidationError("transition_s must be a number")
     transition = float(max(0.0, min(10.0, transition_raw)))
 
     intensity_raw = raw.get("intensity")
     intensity = DEFAULT_INTENSITY if intensity_raw is None else _as_int(intensity_raw, "intensity")
-    if not 1 <= intensity <= 5:  # noqa: PLR2004
+    if not 1 <= intensity <= 5:
         raise PlanValidationError("intensity must be 1..5")
 
     pattern = _enum(raw, "pattern", PATTERNS, "static")

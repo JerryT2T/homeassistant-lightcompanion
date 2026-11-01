@@ -5,12 +5,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
-from custom_components.lightcompanion.planner import Planner  # noqa: F401 (stub or real)
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.lightcompanion.const import DOMAIN, VERSION
+from custom_components.lightcompanion.planner import Planner  # noqa: F401 (stub or real)
 
 
 async def test_setup_and_unload(hass: HomeAssistant, entry, mock_runtime) -> None:

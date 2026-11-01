@@ -8,7 +8,7 @@ import sys
 import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
-from ai_helpers import FakeLight, imp, make_settings  # noqa: E402
+from ai_helpers import FakeLight, imp, make_settings
 
 plan_mod = imp("plan")
 validate_plan = plan_mod.validate_plan
