@@ -20,7 +20,7 @@ contains "aquarium"/"terrarium").
 
 ```
 custom_components/lightcompanion/
-  manifest.json            infra   version 1.0.0
+  manifest.json            infra   version 1.0.1
   const.py                 infra   all constants + option keys + defaults
   __init__.py              infra   setup/unload, runtime_data wiring
   settings.py              infra   Settings dataclass from entry.options
@@ -60,7 +60,7 @@ requirements_test.txt, hacs.json, README.md       infra
 
 ```python
 DOMAIN = "lightcompanion"
-VERSION = "1.0.0"            # kept in sync with manifest by scripts/bump_versions.py
+VERSION = "1.0.1"            # kept in sync with manifest by scripts/bump_versions.py
 PLATFORMS = [Platform.SWITCH]
 FRONTEND_URL_BASE = "/lightcompanion_static"
 CARD_JS = "lightcompanion-card.js"
