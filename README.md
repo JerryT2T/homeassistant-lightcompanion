@@ -1,6 +1,6 @@
 # Light Companion
 
-**Version: 1.0.2**
+**Version: 1.1.0**
 
 Home Assistant integration that turns chat or voice ("disco like the music, but dark colors") into a
 validated light plan and plays it with a local effect engine on the lights of one area (room).
@@ -51,8 +51,9 @@ Services: `lightcompanion.chat` (returns the reply and the applied plan) and `li
 
 ## Coexisting with your light automations
 
-- Every area with an active effect gets a switch (`switch.lightcompanion_<area>_effect`); turn it off to
-  stop the effect and restore the lights.
+- Every area with lights gets a switch (`switch.lightcompanion_<area>_effect`, named "Effect") on its own
+  "Light Companion" child device in that area; turn it off to stop the effect and restore the lights.
+  Requires Home Assistant 2026.11 or newer.
 - **Blocking entities** (input_boolean, switch or binary_sensor, e.g. a cleaning or sleep mode): while one
   is on, effects are refused or stopped.
 - External changes (a scene, script or the user) make the effect release that light; it is not touched again.

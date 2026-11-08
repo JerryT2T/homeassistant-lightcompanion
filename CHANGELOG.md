@@ -2,6 +2,12 @@
 
 All notable changes to Light Companion are documented in this file.
 
+## [1.1.0] — 2026-11-08
+
+### Changed
+- Each area's effect switch now sits on its own child device of "Light Companion", placed in that area. With the Home Assistant 2026.11 naming model the switch is simply called "Effect" and Home Assistant adds the area from context; entity IDs and unique IDs are unchanged
+- Requires Home Assistant 2026.11 or newer (child devices)
+
 ## [1.0.2] — 2026-11-08
 
 ### Changed

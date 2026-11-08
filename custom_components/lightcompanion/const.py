@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 
 DOMAIN = "lightcompanion"
-VERSION = "1.0.2"
+VERSION = "1.1.0"
 PLATFORMS = [Platform.SWITCH]
 FRONTEND_URL_BASE = "/lightcompanion_static"
 CARD_JS = "lightcompanion-card.js"
