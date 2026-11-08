@@ -1,5 +1,7 @@
 # Light Companion
 
+**Version: 1.0.1**
+
 Home Assistant integration that turns chat or voice ("disco like the music, but dark colors") into a
 validated light plan and plays it with a local effect engine on the lights of one area (room).
 It can follow the music playing in that room through Music Assistant. Music Assistant is only **read**,
