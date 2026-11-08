@@ -1,6 +1,6 @@
 # Light Companion
 
-**Version: 1.0.1**
+**Version: 1.0.2**
 
 Home Assistant integration that turns chat or voice ("disco like the music, but dark colors") into a
 validated light plan and plays it with a local effect engine on the lights of one area (room).

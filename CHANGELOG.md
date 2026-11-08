@@ -2,6 +2,13 @@
 
 All notable changes to Light Companion are documented in this file.
 
+## [1.0.2] — 2026-11-08
+
+### Changed
+- Repository links, issue tracker and code owner point to the renamed GitHub account JerryT2T (#37)
+- The README explains how to remove the old 0.x add-on and its repository from the Home Assistant app store, where it shows up as "unknown" (#37)
+- New CHANGELOG (#37)
+
 ## [1.0.1] — 2026-11-04
 
 ### Fixed
