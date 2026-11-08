@@ -8,9 +8,12 @@ never controlled. The integration controls entities in the `light` domain only.
 ## Installation (HACS)
 
 1. HACS -> Integrations -> three-dot menu -> Custom repositories.
-2. Add `https://github.com/Jerry0022/homeassistant-lightcompanion` as category **Integration**.
+2. Add `https://github.com/JerryT2T/homeassistant-lightcompanion` as category **Integration**.
 3. Download **Light Companion** and restart Home Assistant.
 4. Settings -> Devices & services -> Add integration -> **Light Companion**.
+
+Upgrading from the 0.x add-on (app)? 1.0 is an integration only. Uninstall the old **Light Companion App** and
+remove this repository from Settings -> Apps -> App store -> three-dot menu -> Repositories (it shows up as `unknown`).
 
 ## Setup
 
