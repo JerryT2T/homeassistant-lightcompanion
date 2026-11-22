@@ -65,3 +65,17 @@ def test_validate_rejects(bad: dict) -> None:
 def test_validate_accepts_blocking() -> None:
     out = validate_options({"blocking_entities": ["input_boolean.cleaning", "switch.a"]})
     assert out["blocking_entities"] == ["input_boolean.cleaning", "switch.a"]
+
+
+def test_special_lights_roundtrip() -> None:
+    options = validate_options({"special_lights": {"light.star": "Only for stargazing."}})
+    assert options["special_lights"] == {"light.star": "Only for stargazing."}
+    s = Settings.from_options(options)
+    assert s.special_lights == {"light.star": "Only for stargazing."}
+    assert s.public_dict()["special_lights"] == {"light.star": "Only for stargazing."}
+    assert Settings.from_options({}).special_lights == {}
+
+
+def test_special_lights_rejects_long_notes() -> None:
+    with pytest.raises(vol.Invalid):
+        validate_options({"special_lights": {"light.star": "x" * 601}})

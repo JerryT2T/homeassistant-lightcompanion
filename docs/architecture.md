@@ -377,7 +377,7 @@ All commands require auth; `settings/set` additionally `@websocket_api.require_a
 | type | request | result |
 |---|---|---|
 | `lightcompanion/areas` | – | `{"areas": [area dict from lights.async_list_areas + "player": entity_id\|null]}` |
-| `lightcompanion/chat` | `area_id: str, text: str, language?: str` | ChatResult as dict |
+| `lightcompanion/chat` | `area_id: str` **or** `area_ids: list[str]`, `text: str, language?: str` | ChatResult as dict (`areas`: the rooms the plan was applied to) |
 | `lightcompanion/stop` | `area_id: str` | `{}` |
 | `lightcompanion/settings/get` | – | `{"settings": Settings.public_dict(), "is_admin": bool, "providers": [...], "light_candidates": [{"entity_id","name","area"}]}` |
 | `lightcompanion/settings/set` | `options: dict` (partial) | `{"settings": ...}` — validated with the same schema as the options flow, then `hass.config_entries.async_update_entry(entry, options=merged)` (reload follows) |
@@ -385,6 +385,28 @@ All commands require auth; `settings/set` additionally `@websocket_api.require_a
 
 Errors use `connection.send_error(msg_id, code, message)` with codes
 `not_loaded`, `unknown_area`, `invalid_options`.
+
+### Rooms and special lights (1.2)
+
+* `area_id` is the strict single-room call (`Planner.async_chat`, also used by the
+  `lightcompanion.chat` service): the text cannot re-route.
+* `area_ids` carries the rooms selected in the card, possibly none
+  (`Planner.async_chat_rooms`). The prompt then holds the fixed room list
+  (`rooms.Room`: id, name, aliases, floor) and the plan structure gets `rooms`.
+  The AI returns the ids it means; `rooms.resolve_rooms` maps ids, names and
+  aliases back onto the list and drops everything else. Order of precedence:
+  rooms returned by the AI, else the selected rooms, else rooms matched in the
+  text by `rooms.match_rooms`; none of them → `no_room`, nothing is applied.
+* Still ONE AI call per chat command. Light lists are sent for the selected
+  rooms plus rooms `match_rooms` finds in the text (all rooms when neither
+  exists and the home has at most `MAX_AUTO_LIGHTS` lights). The one plan is
+  narrowed per room (`_raw_for_room`) and validated per room; a light id that
+  belongs to none of the rooms in play rejects the whole plan.
+* `special_lights` (option, `entity_id -> note`) marks opt-in lights:
+  `LightInfo.special` / `.note`. `LightPlan.chosen()` never puts them into
+  "all lights"; the AI has to name them in `special_targets`. The note and
+  `MusicService.media_context(area_id)` (active `media_player` entities of the
+  area with state, source, app, title) are part of the prompt.
 
 ## Frontend (frontend)
 

@@ -2,6 +2,20 @@
 
 All notable changes to Light Companion are documented in this file.
 
+## [1.2.0] — 2026-11-22
+
+### Added
+- Several rooms at once: tap more than one room chip and the same plan is applied to all of them, with a single AI call
+- Rooms can be named in the chat instead of tapped. The AI picks them from the fixed room list, so typos, nicknames, aliases and descriptions ("where I cook", "upstairs", "everywhere") work; the reply shows which rooms were used
+- Special lights (opt-in), for example a star projector: mark a light in the card settings and add a note saying when it fits. It is never part of "all lights" and is only switched on when you ask for exactly that light or the note allows it right now
+- The AI is told which media players of a room are on or playing (state, source, app, title), so it can tell a running film from background music
+
+### Changed
+- The card keeps one chat for all rooms instead of one per room
+
+### Fixed
+- Rooms with several Music Assistant players no longer pick an unavailable or switched-off player while another one is usable, and following the music now watches all players of the room instead of only the one that was chosen first
+
 ## [1.1.0] — 2026-11-08
 
 ### Changed

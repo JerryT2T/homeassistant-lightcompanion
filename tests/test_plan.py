@@ -278,3 +278,49 @@ def test_plan_is_immutable():
     plan = check(base())
     with pytest.raises(AttributeError):
         plan.pattern = "strobe"  # type: ignore[misc]
+
+
+# --- special (opt-in) lights ---
+
+OPT_IN = [*LIGHTS, FakeLight("light.star", special=True, effect_list=("Nebula",))]
+
+
+def test_special_targets_keep_only_opt_in_lights():
+    plan = validate_plan(base(special_targets=["light.star", "light.a"]), OPT_IN, SETTINGS)
+    assert plan.special_targets == ("light.star",)
+    assert plan.as_dict()["special_targets"] == ["light.star"]
+    assert [light.entity_id for light in plan.chosen(OPT_IN)] == [
+        "light.a",
+        "light.wled",
+        "light.aquarium",
+        "light.star",
+    ]
+
+
+def test_all_lights_never_include_opt_in_lights():
+    plan = validate_plan(base(), OPT_IN, SETTINGS)
+    assert "light.star" not in [light.entity_id for light in plan.chosen(OPT_IN)]
+
+
+@pytest.mark.parametrize("value", ["light.star", ["light.ghost"], ["light.aquarium"], [5]])
+def test_special_targets_rejects(value):
+    with pytest.raises(PlanValidationError):
+        validate_plan(base(special_targets=value), OPT_IN, SETTINGS)
+
+
+def test_native_effect_for_special_target_next_to_targets():
+    plan = validate_plan(
+        base(
+            targets=["light.a"],
+            special_targets=["light.star"],
+            native_effects={"light.star": "Nebula"},
+        ),
+        OPT_IN,
+        SETTINGS,
+    )
+    assert plan.native_effects == {"light.star": "Nebula"}
+
+
+def test_normalize_parses_stringified_room_and_special_lists():
+    out = normalize_raw_plan({"rooms": '["a"]', "special_targets": '["light.star"]'})
+    assert out["rooms"] == ["a"] and out["special_targets"] == ["light.star"]

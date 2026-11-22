@@ -71,6 +71,31 @@ async def test_chat_and_unknown_area(hass: HomeAssistant, entry, mock_runtime) -
     assert conn.send_error.call_args.args[1] == "unknown_area"
 
 
+async def test_chat_several_rooms(hass: HomeAssistant, entry, mock_runtime) -> None:
+    await _loaded(hass, entry, mock_runtime)
+    reg = ar.async_get(hass)
+    living, kitchen = reg.async_create("Living"), reg.async_create("Kitchen")
+    mock_runtime.planner.async_chat_rooms = AsyncMock(return_value=_Result())
+    conn = _conn()
+    ws.ws_chat(hass, conn, {"id": 1, "area_ids": [living.id, kitchen.id], "text": "hi"})
+    await hass.async_block_till_done()
+    assert conn.send_result.call_args.args[1]["reply"] == "ok"
+    mock_runtime.planner.async_chat_rooms.assert_awaited_once_with(
+        [living.id, kitchen.id], "hi", None
+    )
+
+    # No room selected: the AI picks the rooms from the text.
+    conn = _conn()
+    ws.ws_chat(hass, conn, {"id": 2, "area_ids": [], "text": "kitchen blue", "language": "en"})
+    await hass.async_block_till_done()
+    mock_runtime.planner.async_chat_rooms.assert_awaited_with([], "kitchen blue", "en")
+
+    conn = _conn()
+    ws.ws_chat(hass, conn, {"id": 3, "area_ids": [living.id, "nope"], "text": "hi"})
+    await hass.async_block_till_done()
+    assert conn.send_error.call_args.args[1] == "unknown_area"
+
+
 async def test_chat_blocked(hass: HomeAssistant, entry, mock_runtime) -> None:
     await _loaded(hass, entry, mock_runtime)
     area = ar.async_get(hass).async_create("Living")

@@ -39,6 +39,27 @@ NEGATIVE_TTL_S = 600.0
 BPM_CACHE_SIZE = 500
 REPOLL_INTERVAL_S = 10
 REPOLL_ATTEMPTS = 3
+_RANK_IDLE = 2
+_RANK_UNREACHABLE = 4
+_PLAYER_RANK = {
+    "playing": 0,
+    "paused": 1,
+    "buffering": 1,
+    "off": 3,
+    "standby": 3,
+    "unavailable": _RANK_UNREACHABLE,
+    "unknown": _RANK_UNREACHABLE,
+}
+# States in which a media player matters as context for a lighting decision.
+ACTIVE_MEDIA_STATES = ("playing", "buffering", "paused", "on")
+MEDIA_CONTEXT_LIMIT = 8
+MEDIA_TEXT_LIMIT = 60
+_MEDIA_ATTRS = (
+    ("source", "source"),
+    ("app_name", "app"),
+    ("media_content_type", "type"),
+    ("media_title", "title"),
+)
 
 Color = tuple[int, int, int]
 
@@ -423,25 +444,72 @@ class MusicService:
             players.append((entry.entity_id, area))
         return players
 
-    def player_for_area(self, area_id: str) -> str | None:
+    def _area_players(self, area_id: str) -> list[str]:
+        """The override, else every Music Assistant player of the area."""
         override = self._settings.player_overrides.get(area_id)
         if override:
-            return override
-        candidates = [eid for eid, area in self._ma_players() if area == area_id]
+            return [override]
+        return [eid for eid, area in self._ma_players() if area == area_id]
+
+    def _player_rank(self, entity_id: str) -> int:
+        """Lower is better: playing, then paused, idle, off; unreachable players last."""
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return _RANK_UNREACHABLE
+        return _PLAYER_RANK.get(state.state, _RANK_IDLE)
+
+    def player_for_area(self, area_id: str) -> str | None:
+        candidates = self._area_players(area_id)
         if not candidates:
             return None
-
-        def rank(entity_id: str) -> int:
-            state = self.hass.states.get(entity_id)
-            return {"playing": 0, "paused": 1, "buffering": 1}.get(state.state if state else "", 2)
-
-        return sorted(candidates, key=lambda e: (rank(e), e))[0]
+        return sorted(candidates, key=lambda e: (self._player_rank(e), e))[0]
 
     def track(self, area_id: str) -> TrackInfo | None:
         player = self.player_for_area(area_id)
         if player is None:
             return None
         return track_from_state(player, self.hass.states.get(player))
+
+    def media_context(self, area_id: str) -> list[dict[str, str]]:
+        """Active media players of an area (TV, receiver, speakers): read-only context.
+
+        Lets the AI see that a film is running or which input the receiver is on,
+        so opt-in lights are not switched on at the wrong moment.
+        """
+        from homeassistant.helpers import (
+            device_registry as dr,
+        )
+        from homeassistant.helpers import (
+            entity_registry as er,
+        )
+
+        ent_reg = er.async_get(self.hass)
+        dev_reg = dr.async_get(self.hass)
+        found: list[tuple[int, str, dict[str, str]]] = []
+        for entry in ent_reg.entities.values():
+            if entry.domain != "media_player" or entry.disabled_by or entry.hidden_by:
+                continue
+            area = entry.area_id
+            if area is None and entry.device_id:
+                device = dev_reg.async_get(entry.device_id)
+                area = device.area_id if device else None
+            if area != area_id:
+                continue
+            state = self.hass.states.get(entry.entity_id)
+            if state is None or state.state not in ACTIVE_MEDIA_STATES:
+                continue
+            attrs = state.attributes
+            item = {
+                "name": str(attrs.get("friendly_name") or entry.entity_id)[:MEDIA_TEXT_LIMIT],
+                "state": state.state,
+            }
+            for attr, key in _MEDIA_ATTRS:
+                value = _str(attrs.get(attr))
+                if value:
+                    item[key] = value[:MEDIA_TEXT_LIMIT]
+            found.append((ACTIVE_MEDIA_STATES.index(state.state), entry.entity_id, item))
+        found.sort(key=lambda row: row[:2])
+        return [item for _, _, item in found[:MEDIA_CONTEXT_LIMIT]]
 
     # -- cover palette -----------------------------------------------------
 
@@ -617,9 +685,14 @@ class MusicService:
     def async_track_listener(
         self, area_id: str, cb: Callable[[TrackInfo | None], None]
     ) -> CALLBACK_TYPE:
-        """Call ``cb`` whenever the area player's track or play state changes."""
-        player = self.player_for_area(area_id)
-        if player is None:
+        """Call ``cb`` whenever the area's track or play state changes.
+
+        An area can have several Music Assistant players (receiver, cast device,
+        projector). All of them are watched and the best one is picked on every
+        change, so music started on another player of the room is still followed.
+        """
+        players = self._area_players(area_id)
+        if not players:
             return lambda: None
         from homeassistant.core import callback
         from homeassistant.helpers.event import async_track_state_change_event
@@ -628,11 +701,21 @@ class MusicService:
 
         @callback
         def _changed(event: Any) -> None:
-            track = track_from_state(player, event.data.get("new_state"))
+            changed = event.data.get("entity_id")
+            new_state = event.data.get("new_state")
+
+            def rank(entity_id: str) -> int:
+                if entity_id == changed:
+                    return _PLAYER_RANK.get(getattr(new_state, "state", "unknown"), _RANK_IDLE)
+                return self._player_rank(entity_id)
+
+            player = sorted(players, key=lambda e: (rank(e), e))[0]
+            state = new_state if player == changed else self.hass.states.get(player)
+            track = track_from_state(player, state)
             key = (track.uri, track.title, track.artist, track.is_playing) if track else None
             if key == last[0]:
                 return
             last[0] = key
             cb(track)
 
-        return async_track_state_change_event(self.hass, [player], _changed)
+        return async_track_state_change_event(self.hass, players, _changed)

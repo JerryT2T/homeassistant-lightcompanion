@@ -491,3 +491,27 @@ def test_deezer_http_error_and_missing_metadata():
 def test_cover_palette_without_image_or_pillow():
     svc, _ = service()
     assert run(svc.async_cover_palette(make_track(image_url=None))) == ()
+
+
+# --- several players per room ---
+
+
+def test_player_for_area_skips_unreachable_players(monkeypatch):
+    svc, hass = service()
+    monkeypatch.setattr(
+        svc,
+        "_ma_players",
+        lambda: [
+            ("media_player.a_cast", "room"),
+            ("media_player.b_gone", "room"),
+            ("media_player.c_receiver", "room"),
+        ],
+    )
+    hass.states.data["media_player.a_cast"] = FakeState("unavailable")
+    hass.states.data["media_player.c_receiver"] = FakeState("off")
+    assert svc.player_for_area("room") == "media_player.c_receiver"
+    hass.states.data["media_player.c_receiver"] = FakeState("idle")
+    hass.states.data["media_player.a_cast"] = FakeState("off")
+    assert svc.player_for_area("room") == "media_player.c_receiver"
+    hass.states.data["media_player.a_cast"] = FakeState("paused")
+    assert svc.player_for_area("room") == "media_player.a_cast"

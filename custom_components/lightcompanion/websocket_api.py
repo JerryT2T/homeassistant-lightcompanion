@@ -32,6 +32,7 @@ from .settings import Settings, validate_options
 _LOGGER = logging.getLogger(__name__)
 
 _REGISTERED = "ws_registered"
+MAX_CHAT_ROOMS = 50
 SUBSCRIBE_REFRESH = timedelta(seconds=10)
 
 
@@ -118,7 +119,8 @@ async def ws_areas(
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "lightcompanion/chat",
-        vol.Required("area_id"): str,
+        vol.Exclusive("area_id", "rooms"): str,
+        vol.Exclusive("area_ids", "rooms"): vol.All([str], vol.Length(max=MAX_CHAT_ROOMS)),
         vol.Required("text"): vol.All(str, vol.Length(min=1, max=2000)),
         vol.Optional("language"): str,
     }
@@ -127,18 +129,30 @@ async def ws_areas(
 async def ws_chat(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Run a chat command for an area."""
+    """Run a chat command.
+
+    ``area_id`` addresses exactly one room. ``area_ids`` carries the rooms selected
+    in the card (possibly none): the AI may then pick the rooms the text means.
+    """
     entry = _entry(hass)
     if entry is None:
         _not_loaded(connection, msg["id"])
         return
-    if not _known_area(hass, msg["area_id"]):
-        connection.send_error(msg["id"], "unknown_area", f"Unknown area {msg['area_id']}")
+    multi = "area_ids" in msg
+    if not multi and "area_id" not in msg:
+        connection.send_error(msg["id"], "unknown_area", "No room given")
         return
+    area_ids = list(msg["area_ids"]) if multi else [msg["area_id"]]
+    for area_id in area_ids:
+        if not _known_area(hass, area_id):
+            connection.send_error(msg["id"], "unknown_area", f"Unknown area {area_id}")
+            return
+    planner = entry.runtime_data.planner
     try:
-        result = await entry.runtime_data.planner.async_chat(
-            msg["area_id"], msg["text"], msg.get("language")
-        )
+        if multi:
+            result = await planner.async_chat_rooms(area_ids, msg["text"], msg.get("language"))
+        else:
+            result = await planner.async_chat(area_ids[0], msg["text"], msg.get("language"))
     except EffectBlockedError as err:
         connection.send_error(msg["id"], "blocked", str(err))
         return
