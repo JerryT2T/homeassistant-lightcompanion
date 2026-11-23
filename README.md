@@ -1,6 +1,6 @@
 # Light Companion
 
-**Version: 1.0.2**
+**Version: 1.2.0**
 
 Home Assistant integration that turns chat or voice ("disco like the music, but dark colors") into a
 validated light plan and plays it with a local effect engine on the lights of one area (room).
@@ -38,6 +38,22 @@ area: living_room
 The card is loaded automatically and shows up in the card picker. An optional sidebar panel
 ("Show sidebar panel" option) is hidden by default.
 
+### Several rooms
+
+Tap more than one room chip to light the rooms together: one AI call makes one plan and it is
+applied to every selected room. You can also just name rooms in the chat. The AI picks the rooms from
+your fixed room list, so loose wording works ("kitchn", "the cinema", "where I cook", "upstairs",
+"everywhere"). Rooms named in the text win over the tapped ones; with no chip selected the text alone
+decides. The reply shows which rooms were used.
+
+### Special lights (opt-in)
+
+Some lights only fit certain moments, for example a star projector. Mark them under **Special
+lights** in the card settings and write a short note saying when they fit and when not. Such a light
+is never part of "all lights": the AI switches it on only when you ask for exactly that light, or when
+your note allows it in the current situation. To judge that, the AI is told which media players of
+the room are on or playing, including their source and app (a running film, the receiver's input).
+
 Services: `lightcompanion.chat` (returns the reply and the applied plan) and `lightcompanion.stop`.
 
 ## Safety
@@ -51,8 +67,9 @@ Services: `lightcompanion.chat` (returns the reply and the applied plan) and `li
 
 ## Coexisting with your light automations
 
-- Every area with an active effect gets a switch (`switch.lightcompanion_<area>_effect`); turn it off to
-  stop the effect and restore the lights.
+- Every area with lights gets a switch (`switch.lightcompanion_<area>_effect`, named "Effect") on its own
+  "Light Companion" child device in that area; turn it off to stop the effect and restore the lights.
+  Requires Home Assistant 2026.11 or newer.
 - **Blocking entities** (input_boolean, switch or binary_sensor, e.g. a cleaning or sleep mode): while one
   is on, effects are refused or stopped.
 - External changes (a scene, script or the user) make the effect release that light; it is not touched again.

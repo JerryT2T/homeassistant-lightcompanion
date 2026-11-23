@@ -50,6 +50,9 @@ class LightInfo:
     max_kelvin: int | None
     is_group: bool
     excluded: bool
+    # Opt-in light: never part of "all lights"; ``note`` tells the AI when it fits.
+    special: bool = False
+    note: str = ""
 
 
 def _restrictiveness(transport: str) -> float:
@@ -162,6 +165,7 @@ def _build_info(  # noqa: PLR0913, PLR0917
     modes = tuple(str(m) for m in (attrs.get(ATTR_SUPPORTED_COLOR_MODES) or ()))
     min_k = attrs.get("min_color_temp_kelvin")
     max_k = attrs.get("max_color_temp_kelvin")
+    special = getattr(settings, "special_lights", None) or {}
     return LightInfo(
         entity_id=entry.entity_id,
         name=str(name),
@@ -181,6 +185,8 @@ def _build_info(  # noqa: PLR0913, PLR0917
             area_name,
             _has_exclude_label(hass, entry, dev_reg, settings),
         ),
+        special=entry.entity_id in special,
+        note=str(special.get(entry.entity_id) or ""),
     )
 
 

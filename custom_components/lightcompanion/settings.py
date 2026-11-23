@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
@@ -25,6 +25,7 @@ from .const import (
     CONF_MODEL,
     CONF_PLAYER_OVERRIDES,
     CONF_SHOW_PANEL,
+    CONF_SPECIAL_LIGHTS,
     DEFAULT_AI_CALLS_PER_HOUR,
     DEFAULT_ALLOW_STROBE,
     DEFAULT_EXCLUDE_KEYWORDS,
@@ -36,6 +37,7 @@ from .const import (
     LLM_PROVIDERS,
     MAX_AI_CALLS_PER_HOUR,
     MAX_LIGHT_RATE,
+    MAX_SPECIAL_NOTE,
     MIN_AI_CALLS_PER_HOUR,
     MIN_LIGHT_RATE,
 )
@@ -85,6 +87,12 @@ OPTIONS_SCHEMA = vol.Schema(
             vol.All(str, vol.Match(r"^(input_boolean|switch|binary_sensor)\.[a-z0-9_]+$"))
         ],
         vol.Optional(CONF_EXCLUDE_LABEL): _OPT_STR,
+        # Opt-in lights: entity id -> the owner's note telling the AI when to use it.
+        vol.Optional(CONF_SPECIAL_LIGHTS): {
+            vol.All(str, vol.Match(r"^light\.[a-z0-9_]+$")): vol.All(
+                str, vol.Length(max=MAX_SPECIAL_NOTE)
+            )
+        },
     },
     extra=vol.REMOVE_EXTRA,
 )
@@ -121,6 +129,7 @@ class Settings:
     show_panel: bool
     blocking_entities: tuple[str, ...]
     exclude_label: str
+    special_lights: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
 
     @classmethod
     def from_options(cls, options: Mapping[str, Any]) -> Settings:
@@ -141,6 +150,8 @@ class Settings:
             else list(DEFAULT_EXCLUDE_KEYWORDS)
         )
         overrides = options.get(CONF_PLAYER_OVERRIDES) or {}
+        special = options.get(CONF_SPECIAL_LIGHTS)
+        special = special if isinstance(special, Mapping) else {}
         return cls(
             llm_provider=provider,
             ai_task_entity=_opt_str(options.get(CONF_AI_TASK_ENTITY)),
@@ -164,6 +175,13 @@ class Settings:
             show_panel=bool(options.get(CONF_SHOW_PANEL, DEFAULT_SHOW_PANEL)),
             blocking_entities=tuple(_str_list(options.get(CONF_BLOCKING_ENTITIES))),
             exclude_label=_opt_str(options.get(CONF_EXCLUDE_LABEL)) or DEFAULT_EXCLUDE_LABEL,
+            special_lights=MappingProxyType(
+                {
+                    str(k): str(v or "").strip()[:MAX_SPECIAL_NOTE]
+                    for k, v in special.items()
+                    if isinstance(k, str) and k.startswith("light.")
+                }
+            ),
         )
 
     def public_dict(self) -> dict[str, Any]:
@@ -184,4 +202,5 @@ class Settings:
             CONF_SHOW_PANEL: self.show_panel,
             CONF_BLOCKING_ENTITIES: list(self.blocking_entities),
             CONF_EXCLUDE_LABEL: self.exclude_label,
+            CONF_SPECIAL_LIGHTS: dict(self.special_lights),
         }

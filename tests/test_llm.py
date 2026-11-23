@@ -384,3 +384,43 @@ def test_prompt_strobe_setting_is_stated():
     assert "owner: yes" in prompt.build_chat_instructions(
         settings=make_settings(allow_strobe=True), **kw
     )
+
+
+def test_rooms_prompt_lists_rooms_selection_lights_and_media():
+    rooms = imp("rooms")
+    home = [
+        rooms.Room("cinema", "Heimkino", floor="Erdgeschoss"),
+        rooms.Room("kitchen", "Küche", aliases=("Kochecke",)),
+    ]
+    star = FakeLight("light.star", name="Stars", special=True, note="Never while a film runs.")
+    text = prompt.build_rooms_instructions(
+        rooms=home,
+        selected=["cinema"],
+        sections=[
+            prompt.RoomSection(
+                "cinema",
+                "Heimkino",
+                [FakeLight("light.sofa", name="Sofa"), star],
+                media=[{"name": "TV", "state": "playing", "source": "Media Player"}],
+            )
+        ],
+        settings=make_settings(),
+        text="mach es gemütlich",
+        language="de",
+    )
+    assert '{"id":"kitchen","name":"Küche","aliases":["Kochecke"]}' in text
+    assert '"floor":"Erdgeschoss"' in text
+    assert "Rooms selected in the app: cinema (Heimkino)" in text
+    assert "=== Room cinema (Heimkino) ===" in text and "light.sofa" in text
+    assert '"special":true' in text and "Never while a film runs." in text
+    assert '"source": "Media Player"' in text
+    assert "Rooms without a light list" in text
+    assert "<user_request>mach es gemütlich</user_request>" in text
+    assert "special_targets" in text
+
+
+def test_structure_has_rooms_only_when_asked():
+    assert "rooms" not in prompt.plan_structure()
+    schema = base.structure_to_json_schema(prompt.plan_structure(with_rooms=True))
+    assert schema["properties"]["rooms"]["type"] == "array"
+    assert schema["properties"]["special_targets"]["type"] == "array"

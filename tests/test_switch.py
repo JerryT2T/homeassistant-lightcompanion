@@ -7,7 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.lightcompanion.const import DOMAIN
 from custom_components.lightcompanion.switch import (
@@ -56,18 +58,23 @@ class FakeEngine:
 
 
 def make_switch(engine: FakeEngine) -> LightCompanionEffectSwitch:
-    return LightCompanionEffectSwitch("entry1", engine, "living", "Living")  # type: ignore[arg-type]
+    return LightCompanionEffectSwitch("entry1", engine, "living", "Living", "parent1")  # type: ignore[arg-type]
 
 
 def test_entity_identity() -> None:
     sw = make_switch(FakeEngine())
+    # entity_id and unique_id must not change with the move to child devices
     assert sw.entity_id == "switch.lightcompanion_living_effect"
     assert sw.unique_id == "entry1_living_effect"
     assert sw.has_entity_name
     assert sw.translation_key == "effect"
-    assert sw.translation_placeholders == {"area": "Living"}
-    assert sw.device_info["identifiers"] == {(DOMAIN, "entry1")}
-    assert sw.device_info["entry_type"].value == "service"
+    assert not sw.translation_placeholders
+    info = sw.device_info
+    assert "entry_type" not in info  # a child device, not a standalone service device
+    assert info["identifiers"] == {(DOMAIN, "entry1_living")}
+    assert info["parent_device_id"] == "parent1"
+    assert info["suggested_area"] == "Living"
+    assert info["name"] == "Light Companion"
 
 
 def test_state_and_attributes_follow_engine() -> None:
@@ -121,9 +128,34 @@ async def test_setup_creates_one_switch_per_area_with_lights(hass: HomeAssistant
     reg.async_update_entity(entry.entity_id, area_id=area)
     hass.states.async_set(entry.entity_id, "on", {"friendly_name": "A"})
     settings = SimpleNamespace(excluded_lights=(), exclude_keywords=(), exclude_label="x")
-    config_entry = SimpleNamespace(
-        entry_id="e1", runtime_data=SimpleNamespace(settings=settings, engine=FakeEngine())
-    )
+    config_entry = MockConfigEntry(domain=DOMAIN, entry_id="e1")
+    config_entry.add_to_hass(hass)
+    config_entry.runtime_data = SimpleNamespace(settings=settings, engine=FakeEngine())
     added: list = []
     await async_setup_entry(hass, config_entry, lambda ents: added.extend(ents))  # type: ignore[arg-type]
     assert [e.entity_id for e in added] == [f"switch.lightcompanion_{area}_effect"]
+
+    dev_reg = dr.async_get(hass)
+    parent = dev_reg.async_get_device_by_identifier((DOMAIN, "e1"), "e1")
+    assert parent is not None
+    assert parent.name == "Light Companion"
+    assert added[0].device_info["parent_device_id"] == parent.id
+
+
+async def test_child_device_lands_in_its_area(hass: HomeAssistant) -> None:
+    """The child device info registers a child of the parent, placed in the area."""
+    area = ar.async_get(hass).async_create("Living")
+    config_entry = MockConfigEntry(domain=DOMAIN, entry_id="e1")
+    config_entry.add_to_hass(hass)
+    dev_reg = dr.async_get(hass)
+    parent = dev_reg.async_get_or_create(
+        config_entry_id="e1",
+        identifiers={(DOMAIN, "e1")},
+        entry_type=dr.DeviceEntryType.SERVICE,
+        name="Light Companion",
+    )
+    sw = LightCompanionEffectSwitch("e1", FakeEngine(), area.id, area.name, parent.id)  # type: ignore[arg-type]
+    child = dev_reg.async_get_or_create_child(config_entry_id="e1", **sw.device_info)
+    assert child.parent_device_id == parent.id
+    assert child.area_id == area.id
+    assert child.name == "Light Companion"

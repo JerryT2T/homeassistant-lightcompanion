@@ -52,6 +52,22 @@ class LightPlan:
     transition_s: float
     native_effects: Mapping[str, str] = field(default_factory=dict)
     strobe_capped: bool = False
+    # Opt-in lights the plan switches on in addition to ``targets``.
+    special_targets: tuple[str, ...] = ()
+
+    def chosen(self, lights: Sequence[LightInfo]) -> list[LightInfo]:
+        """The lights this plan touches: targets (or all normal lights) plus opt-ins."""
+        extra = set(self.special_targets)
+        return [
+            light
+            for light in lights
+            if light.entity_id in extra
+            or (
+                light.entity_id in self.targets
+                if self.targets
+                else not getattr(light, "special", False)
+            )
+        ]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -69,6 +85,7 @@ class LightPlan:
             "transition_s": self.transition_s,
             "native_effects": dict(self.native_effects),
             "strobe_capped": self.strobe_capped,
+            "special_targets": list(self.special_targets),
         }
 
 
@@ -113,7 +130,7 @@ def normalize_raw_plan(raw: Any) -> Any:
     if not isinstance(raw, Mapping):
         return raw
     out = dict(raw)
-    for key in ("palette", "targets", "native_effects"):
+    for key in ("palette", "targets", "special_targets", "rooms", "native_effects"):
         value = out.get(key)
         if isinstance(value, str):
             with contextlib.suppress(ValueError):
@@ -187,6 +204,18 @@ def validate_plan(  # noqa: PLR0912, PLR0915 - one linear rule list, kept in one
             if target not in targets:
                 targets.append(target)
 
+    special_raw = raw.get("special_targets")
+    special_targets: list[str] = []
+    if special_raw is not None:
+        if not isinstance(special_raw, (list, tuple)):
+            raise PlanValidationError("special_targets must be a list of entity ids")
+        for target in special_raw:
+            if not isinstance(target, str) or target not in allowed:
+                raise PlanValidationError(f"unknown or excluded special target: {target!r}")
+            # Only opt-in lights count here; a normal light is covered by ``targets``.
+            if getattr(allowed[target], "special", False) and target not in special_targets:
+                special_targets.append(target)
+
     palette = _palette(raw)
 
     kelvin_raw = raw.get("color_temp_kelvin")
@@ -231,7 +260,7 @@ def validate_plan(  # noqa: PLR0912, PLR0915 - one linear rule list, kept in one
             light = allowed.get(entity_id) if isinstance(entity_id, str) else None
             if light is None:
                 raise PlanValidationError(f"native effect for unknown light: {entity_id!r}")
-            if targets and entity_id not in targets:
+            if targets and entity_id not in targets and entity_id not in special_targets:
                 raise PlanValidationError(f"native effect for non-target light: {entity_id}")
             if not isinstance(effect, str) or effect not in light.effect_list:
                 raise PlanValidationError(f"effect not supported by {entity_id}: {effect!r}")
@@ -252,4 +281,5 @@ def validate_plan(  # noqa: PLR0912, PLR0915 - one linear rule list, kept in one
         transition_s=transition,
         native_effects=native,
         strobe_capped=strobe_capped,
+        special_targets=tuple(special_targets),
     )

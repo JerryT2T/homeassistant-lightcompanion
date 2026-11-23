@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 
 DOMAIN = "lightcompanion"
-VERSION = "1.0.2"
+VERSION = "1.2.0"
 PLATFORMS = [Platform.SWITCH]
 FRONTEND_URL_BASE = "/lightcompanion_static"
 CARD_JS = "lightcompanion-card.js"
@@ -32,6 +32,7 @@ CONF_DEFAULT_AREA = "default_area"
 CONF_SHOW_PANEL = "show_panel"
 CONF_BLOCKING_ENTITIES = "blocking_entities"
 CONF_EXCLUDE_LABEL = "exclude_label"
+CONF_SPECIAL_LIGHTS = "special_lights"
 
 PROVIDER_AI_TASK = "ai_task"
 PROVIDER_CONVERSATION = "conversation"
@@ -56,6 +57,7 @@ DEFAULT_EXCLUDE_KEYWORDS = ("aquarium", "terrarium")
 DEFAULT_SHOW_PANEL = False
 DEFAULT_EXCLUDE_LABEL = "lightcompanion_exclude"
 BLOCKING_DOMAINS = ("input_boolean", "switch", "binary_sensor")
+MAX_SPECIAL_NOTE = 600
 
 # Service names
 SERVICE_CHAT = "chat"

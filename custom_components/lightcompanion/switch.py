@@ -7,7 +7,8 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceEntryType
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -16,17 +17,35 @@ from .lights import async_list_areas
 
 PARALLEL_UPDATES = 0
 
+DEVICE_NAME = "Light Companion"
+
+
+def area_device_identifier(entry_id: str, area_id: str) -> tuple[str, str]:
+    """Identifier of the child device that holds one area's entities."""
+    return (DOMAIN, f"{entry_id}_{area_id}")
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create one effect switch for every area that has lights."""
+    """Create one effect switch for every area that has lights.
+
+    Each area gets a child device of the main "Light Companion" device, placed
+    in that area. With the Home Assistant 2026.11 naming model the area then
+    comes from context, so the entity itself is just called "Effect".
+    """
     data = entry.runtime_data
+    parent = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        entry_type=DeviceEntryType.SERVICE,
+        name=DEVICE_NAME,
+    )
     areas = async_list_areas(hass, data.settings)
     async_add_entities(
-        LightCompanionEffectSwitch(entry.entry_id, data.engine, a["area_id"], a["name"])
+        LightCompanionEffectSwitch(entry.entry_id, data.engine, a["area_id"], a["name"], parent.id)
         for a in areas
     )
 
@@ -38,16 +57,25 @@ class LightCompanionEffectSwitch(SwitchEntity):
     _attr_translation_key = "effect"
     _attr_should_poll = False
 
-    def __init__(self, entry_id: str, engine: EffectEngine, area_id: str, area_name: str) -> None:
+    def __init__(
+        self,
+        entry_id: str,
+        engine: EffectEngine,
+        area_id: str,
+        area_name: str,
+        parent_device_id: str,
+    ) -> None:
         self._engine = engine
         self._area_id = area_id
+        # unique_id and entity_id stay as they were before the child devices,
+        # so automations and dashboards keep working.
         self._attr_unique_id = f"{entry_id}_{area_id}_effect"
-        self._attr_translation_placeholders = {"area": area_name}
         self.entity_id = f"switch.lightcompanion_{area_id}_effect"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry_id)},
-            entry_type=DeviceEntryType.SERVICE,
-            name="Light Companion",
+        self._attr_device_info = ChildDeviceInfo(
+            identifiers={area_device_identifier(entry_id, area_id)},
+            name=DEVICE_NAME,
+            parent_device_id=parent_device_id,
+            suggested_area=area_name,
         )
 
     async def async_added_to_hass(self) -> None:

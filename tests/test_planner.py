@@ -420,3 +420,162 @@ def test_listener_notified():
     hits.clear()
     run(p.async_chat("room", "x", "en"))
     assert not hits
+
+
+# --- special (opt-in) lights ---
+
+
+STAR = FakeLight("light.star", name="Star projector", special=True, note="Not while a film runs.")
+
+
+def test_special_light_is_not_part_of_all_lights(monkeypatch):
+    monkeypatch.setattr(planner_mod, "_area_lights", lambda *a: [*LIGHTS, STAR])
+    p, _, client, engine, _ = build()
+    run(p.async_chat("room", "cozy", "en"))
+    assert engine.applied[0][2] == ["light.a", "light.b"]
+    prompt_text = client.calls[0][1]
+    assert '"special":true' in prompt_text and "Not while a film runs." in prompt_text
+
+
+def test_special_light_joins_only_when_named(monkeypatch):
+    monkeypatch.setattr(planner_mod, "_area_lights", lambda *a: [*LIGHTS, STAR])
+    p, _, _, engine, _ = build({**GOOD, "special_targets": ["light.star"]})
+    res = run(p.async_chat("room", "stars please", "en"))
+    assert engine.applied[0][2] == ["light.a", "light.b", "light.star"]
+    assert res.plan["special_targets"] == ["light.star"]
+
+    p, _, _, engine, _ = build({**GOOD, "targets": ["light.star"]})
+    run(p.async_chat("room", "only the stars", "en"))
+    assert engine.applied[0][2] == ["light.star"]
+
+
+def test_special_targets_ignore_normal_lights_and_reject_unknown(monkeypatch):
+    monkeypatch.setattr(planner_mod, "_area_lights", lambda *a: [*LIGHTS, STAR])
+    p, _, _, engine, _ = build({**GOOD, "targets": ["light.a"], "special_targets": ["light.b"]})
+    run(p.async_chat("room", "x", "en"))
+    assert engine.applied[0][2] == ["light.a"]
+
+    p, _, _, engine, _ = build({**GOOD, "special_targets": ["light.ghost"]})
+    res = run(p.async_chat("room", "x", "en"))
+    assert res.error == "invalid_plan" and engine.applied == []
+
+
+def test_media_context_reaches_the_prompt():
+    p, _, client, _, mus = build()
+    mus.media_context = lambda area: [{"name": "TV", "state": "playing", "app": "YouTube"}]
+    run(p.async_chat("room", "x", "en"))
+    assert '"app": "YouTube"' in client.calls[0][1]
+    mus.media_context = lambda area: []
+    run(p.async_chat("room", "x", "en"))
+    assert "nothing is playing" in client.calls[1][1]
+
+
+# --- several rooms, rooms picked from the text ---
+
+Room = imp("rooms").Room
+HOME = [
+    Room("cinema", "Heimkino", light_count=2),
+    Room("kitchen", "Küche", aliases=("Kochecke",), light_count=1),
+    Room("bath", "Badezimmer", light_count=1),
+]
+ROOM_LIGHTS = {
+    "cinema": [FakeLight("light.c1", area_id="cinema"), STAR],
+    "kitchen": [FakeLight("light.k1", area_id="kitchen", effect_list=("Rainbow",))],
+    "bath": [FakeLight("light.b1", area_id="bath")],
+}
+
+
+@pytest.fixture
+def home(monkeypatch):
+    monkeypatch.setattr(planner_mod, "_room_directory", lambda hass, st: list(HOME))
+    monkeypatch.setattr(
+        planner_mod, "_area_lights", lambda hass, area, st: list(ROOM_LIGHTS.get(area, []))
+    )
+
+
+def applied_map(engine):
+    return {area: ids for area, _plan, ids, _source in engine.applied}
+
+
+def test_selected_rooms_get_one_plan_with_one_ai_call(home):
+    p, _, client, engine, _ = build(limit=5)
+    res = run(p.async_chat_rooms(["cinema", "kitchen"], "cozy", "de"))
+    assert res.applied and res.areas == ("cinema", "kitchen")
+    assert applied_map(engine) == {"cinema": ["light.c1"], "kitchen": ["light.k1"]}
+    assert len(client.calls) == 1 and p.status()["ai"]["used"] == 1
+    text, schema = client.calls[0][1], client.calls[0][2]
+    assert "rooms" in schema
+    assert "Rooms selected in the app: cinema (Heimkino), kitchen (Küche)" in text
+    assert "=== Room cinema" in text and "=== Room kitchen" in text
+    assert "=== Room bath" not in text and '"id":"bath"' in text
+
+
+def test_room_named_in_text_wins_over_selection(home):
+    p, _, client, engine, _ = build({**GOOD, "rooms": ["kitchen"]})
+    res = run(p.async_chat_rooms(["cinema"], "mach die Kueche blau", "de"))
+    assert res.areas == ("kitchen",) and applied_map(engine) == {"kitchen": ["light.k1"]}
+    # The typo was matched, so the kitchen lights were described to the AI.
+    assert "=== Room kitchen" in client.calls[0][1]
+
+
+def test_ai_may_answer_with_room_names_and_pick_unlisted_rooms(home):
+    p, _, client, engine, _ = build({**GOOD, "rooms": ["Badezimmer", "attic"]})
+    res = run(p.async_chat_rooms(["cinema"], "da wo ich dusche", "de"))
+    assert "=== Room bath" not in client.calls[0][1]
+    assert res.areas == ("bath",) and applied_map(engine) == {"bath": ["light.b1"]}
+
+
+def test_no_selection_lets_the_ai_choose_from_all_rooms(home):
+    p, _, client, engine, _ = build({**GOOD, "rooms": ["cinema"]})
+    res = run(p.async_chat_rooms([], "kino gemütlich", "de"))
+    text = client.calls[0][1]
+    assert "Rooms selected in the app: none" in text
+    assert all(f"=== Room {a}" in text for a in ("cinema", "kitchen", "bath"))
+    assert res.areas == ("cinema",) and list(applied_map(engine)) == ["cinema"]
+
+
+def test_no_room_found_changes_nothing(home):
+    p, _, _, engine, _ = build({"action": "none", "reply": "Welcher Raum?"})
+    res = run(p.async_chat_rooms([], "gemütlich", "de"))
+    assert res.reply == "Welcher Raum?" and not res.applied and res.error is None
+    p, _, _, engine, _ = build(GOOD)
+    res = run(p.async_chat_rooms([], "gemütlich", "de"))
+    assert res.error == "no_room" and engine.applied == []
+
+
+def test_targets_are_split_per_room_and_listed_rooms_without_targets_are_skipped(home):
+    p, _, _, engine, _ = build(
+        {**GOOD, "targets": ["light.k1"], "native_effects": {"light.k1": "Rainbow"}}
+    )
+    res = run(p.async_chat_rooms(["cinema", "kitchen"], "nur die Küchenlampe", "de"))
+    assert res.areas == ("kitchen",) and applied_map(engine) == {"kitchen": ["light.k1"]}
+    assert engine.applied[0][1].native_effects == {"light.k1": "Rainbow"}
+
+
+def test_special_light_in_one_of_several_rooms(home):
+    p, _, _, engine, _ = build({**GOOD, "special_targets": ["light.star"]})
+    run(p.async_chat_rooms(["cinema", "kitchen"], "Sternenhimmel", "de"))
+    assert applied_map(engine) == {
+        "cinema": ["light.c1", "light.star"],
+        "kitchen": ["light.k1"],
+    }
+
+
+def test_unknown_light_rejects_the_whole_multi_room_plan(home):
+    p, _, _, engine, _ = build({**GOOD, "targets": ["light.c1", "light.ghost"]})
+    res = run(p.async_chat_rooms(["cinema", "kitchen"], "x", "de"))
+    assert res.error == "invalid_plan" and engine.applied == []
+
+
+def test_unknown_selected_rooms_are_ignored_and_stop_hits_every_room(home):
+    p, _, _, engine, _ = build({"action": "stop", "reply": "Aus"})
+    res = run(p.async_chat_rooms(["cinema", "nowhere", "bath"], "stopp", "de"))
+    assert res.areas == ("cinema", "bath")
+    assert engine.stopped == [("cinema", True), ("bath", True)]
+
+
+def test_follow_music_is_tracked_per_room(home):
+    p, _, _, _, mus = build({**GOOD, "follow_music": True})
+    mus.current = track("u1")
+    run(p.async_chat_rooms(["cinema", "kitchen"], "folge der Musik", "de"))
+    assert set(p.status()["follow"]) == {"cinema", "kitchen"}

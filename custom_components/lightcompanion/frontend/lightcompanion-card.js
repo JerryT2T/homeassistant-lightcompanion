@@ -9,6 +9,8 @@ const DESKTOP_QUERY = "(min-width: 870px) and (hover: hover) and (pointer: fine)
 const STRINGS = {
   en: {
     placeholder: "Describe the light you want…",
+    placeholderAuto: "Name the room and describe the light…",
+    roomsHint: "Tap several rooms to light them together, or name rooms in the chat.",
     send: "Send",
     mic: "Voice input",
     micStop: "Stop listening",
@@ -41,6 +43,7 @@ const STRINGS = {
     "err.not_configured": "No AI provider is configured yet. Set one up in the Light Companion settings.",
     "err.not_loaded": "Light Companion is not loaded.",
     "err.unknown_area": "That room is unknown.",
+    "err.no_room": "I could not tell which room you mean. Tap a room or name it.",
     "err.generic": "Something went wrong.",
     "p.static": "Static",
     "p.breathe": "Breathe",
@@ -72,6 +75,9 @@ const STRINGS = {
     sExcluded: "Excluded lights",
     sExcludedHelp: "Checked lights are never touched. Lights matching an exclude keyword are locked.",
     sKeyword: "Matches a keyword",
+    sSpecial: "Special lights (opt-in)",
+    sSpecialHelp: "Checked lights are never part of “all lights”. The AI switches one on only when you ask for exactly that light or when your note allows it right now. It also sees which media players in the room are on.",
+    sSpecialNote: "When does this light fit, and when not?",
     sKeywords: "Exclude keywords",
     sKeywordsHelp: "Comma separated. Lights whose name or room contains one are excluded.",
     sPlayers: "Music player per room",
@@ -90,6 +96,8 @@ const STRINGS = {
   },
   de: {
     placeholder: "Beschreibe das gewünschte Licht…",
+    placeholderAuto: "Raum nennen und Licht beschreiben…",
+    roomsHint: "Tippe mehrere Räume an, um sie gemeinsam zu steuern, oder nenne Räume im Chat.",
     send: "Senden",
     mic: "Spracheingabe",
     micStop: "Aufnahme beenden",
@@ -122,6 +130,7 @@ const STRINGS = {
     "err.not_configured": "Es ist noch kein KI-Anbieter eingerichtet. Richte ihn in den Light-Companion-Einstellungen ein.",
     "err.not_loaded": "Light Companion ist nicht geladen.",
     "err.unknown_area": "Dieser Raum ist unbekannt.",
+    "err.no_room": "Ich konnte nicht erkennen, welcher Raum gemeint ist. Tippe einen Raum an oder nenne ihn.",
     "err.generic": "Etwas ist schiefgelaufen.",
     "p.static": "Statisch",
     "p.breathe": "Atmen",
@@ -153,6 +162,9 @@ const STRINGS = {
     sExcluded: "Ausgeschlossene Lichter",
     sExcludedHelp: "Angehakte Lichter werden nie angefasst. Lichter mit passendem Ausschluss-Stichwort sind gesperrt.",
     sKeyword: "Passt auf ein Stichwort",
+    sSpecial: "Sonderlichter (nur auf Wunsch)",
+    sSpecialHelp: "Angehakte Lichter gehören nie zu „alle Lichter“. Die KI schaltet eines nur ein, wenn du genau dieses Licht verlangst oder dein Hinweis es in der aktuellen Situation erlaubt. Sie sieht dabei, welche Mediaplayer im Raum gerade laufen.",
+    sSpecialNote: "Wann passt dieses Licht, wann nicht?",
     sKeywords: "Ausschluss-Stichwörter",
     sKeywordsHelp: "Kommagetrennt. Lichter, deren Name oder Raum eines enthält, werden ausgeschlossen.",
     sPlayers: "Musik-Player pro Raum",
@@ -327,7 +339,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .chip:focus-vis
 .chips.has-gear { padding-right: 48px; }
 .chip { flex: none; scroll-snap-align: start; border: 1px solid var(--divider-color); background: color-mix(in srgb, var(--card-background-color) 70%, transparent);
   color: var(--primary-text-color); border-radius: 999px; padding: 0 16px; min-height: 44px; font-size: 14px; transition: background .2s, border-color .2s, color .2s; backdrop-filter: blur(6px); }
-.chip[aria-selected="true"] { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); }
+.chip[aria-pressed="true"] { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); }
 .gear { position: absolute !important; top: 14px; right: 12px; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--divider-color);
   background: color-mix(in srgb, var(--card-background-color) 70%, transparent); display: grid; place-items: center; padding: 0; z-index: 3 !important; }
 .gear svg, .iconbtn svg { width: 22px; height: 22px; fill: currentColor; }
@@ -391,6 +403,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, .chip:focus-vis
 .check input { width: 18px; height: 18px; accent-color: var(--primary-color); }
 .list { max-height: 190px; overflow-y: auto; border: 1px solid var(--divider-color); border-radius: 8px; padding: 4px 10px; }
 .list .check small { color: var(--secondary-text-color); }
+.list textarea { width: 100%; min-height: 64px; margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); font: inherit; font-size: 13px; resize: vertical; }
+.empty .help { font-size: 12px; }
+.bubble .tag { display: block; margin-top: 4px; font-size: 12px; opacity: .7; }
 .btn { min-height: 40px; padding: 0 18px; border-radius: 20px; border: 1px solid var(--divider-color); background: transparent; }
 .btn.primary { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); }
 .btn:disabled { opacity: .5; cursor: default; }
@@ -442,11 +457,11 @@ class LightCompanionCard extends HTMLElement {
     this._areas = [];
     this._areasLoaded = false;
     this._loadError = null;
-    this._area = null;
+    this._sel = [];
     this._userPicked = false;
     this._defaultArea = null;
-    this._threads = new Map();
-    this._pending = new Set();
+    this._thread = [];
+    this._busy = false;
     this._status = { engine: {}, planner: {} };
     this._unsub = null;
     this._subscribing = false;
@@ -463,8 +478,8 @@ class LightCompanionCard extends HTMLElement {
 
   setConfig(config) {
     this._config = { ...(config || {}) };
-    if (!this._userPicked) this._area = null;
-    if (this._built) this._resolveArea();
+    if (!this._userPicked) this._sel = [];
+    if (this._built) this._resolveSel();
     this._renderAll();
   }
 
@@ -541,7 +556,7 @@ class LightCompanionCard extends HTMLElement {
       const s = await this._hass.callWS({ type: "lightcompanion/settings/get" });
       this._defaultArea = s?.settings?.default_area || null;
     } catch (_e) { /* optional */ }
-    this._resolveArea();
+    this._resolveSel();
     this._renderAll();
   }
 
@@ -568,20 +583,31 @@ class LightCompanionCard extends HTMLElement {
     }
   }
 
-  _resolveArea() {
+  /* Selected rooms. Once the user tapped a chip the selection is theirs and may be empty:
+     then the AI picks the rooms from the chat text. */
+  _resolveSel() {
     const ids = this._areas.map((a) => a.area_id);
-    let want = this._userPicked && ids.includes(this._area) ? this._area : null;
-    if (!want && this._config.area && ids.includes(this._config.area)) want = this._config.area;
+    if (this._userPicked) { this._sel = this._sel.filter((a) => ids.includes(a)); return; }
+    let want = null;
+    if (this._config.area && ids.includes(this._config.area)) want = this._config.area;
     if (!want && this._defaultArea && ids.includes(this._defaultArea)) want = this._defaultArea;
     if (!want) want = ids[0] || null;
-    this._area = want;
+    this._sel = want ? [want] : [];
   }
 
-  _areaObj() { return this._areas.find((a) => a.area_id === this._area) || null; }
-
-  _areaLights() {
-    return (this._areaObj()?.lights || []).filter((l) => !l.excluded);
+  _toggleArea(areaId) {
+    this._userPicked = true;
+    this._sel = this._sel.includes(areaId) ? this._sel.filter((a) => a !== areaId) : [...this._sel, areaId];
+    this._renderAll();
   }
+
+  _areaName(areaId) { return this._areas.find((a) => a.area_id === areaId)?.name || areaId; }
+
+  _selLights() {
+    return this._areas.filter((a) => this._sel.includes(a.area_id)).flatMap((a) => a.lights || []).filter((l) => !l.excluded);
+  }
+
+  _activeAreas() { return this._sel.filter((a) => this._status.engine?.[a]?.active); }
 
   /* ---- build DOM once ---- */
 
@@ -590,7 +616,7 @@ class LightCompanionCard extends HTMLElement {
     const root = this.shadowRoot;
     root.append(h("style", { text: STYLE }));
 
-    this._elChips = h("div", { class: "chips", role: "tablist" });
+    this._elChips = h("div", { class: "chips", role: "group" });
     this._elGear = h("button", { class: "gear", type: "button", hidden: true, onclick: () => this._openSettings() }, icon("gear"));
     this._elHalo = h("div", { class: "halo" });
     this._elOrb = h("div", { class: "orb", role: "img" });
@@ -614,8 +640,8 @@ class LightCompanionCard extends HTMLElement {
   _renderAll() {
     if (!this._built) return;
     const t = makeT(this._hass);
-    this._elInput.placeholder = t("placeholder");
-    this._elInput.setAttribute("aria-label", t("placeholder"));
+    this._elInput.placeholder = this._placeholder();
+    this._elInput.setAttribute("aria-label", this._placeholder());
     this._elMic.setAttribute("aria-label", this._voice ? t("micStop") : t("mic"));
     this._elMic.dataset.tip = this._voice ? t("micStop") : t("mic");
     this._elSend.setAttribute("aria-label", t("send"));
@@ -624,16 +650,14 @@ class LightCompanionCard extends HTMLElement {
     this._elGear.dataset.tip = t("settings");
     this._elChips.setAttribute("aria-label", t("rooms"));
 
-    this._elChips.replaceChildren(...this._areas.map((a) => {
-      const sel = a.area_id === this._area;
-      return h("button", {
-        class: "chip", type: "button", role: "tab", "aria-selected": sel ? "true" : "false",
-        onclick: () => { this._userPicked = true; this._area = a.area_id; this._renderAll(); },
-      }, a.name || a.area_id);
-    }));
+    const scroll = this._elChips.scrollLeft;
+    this._elChips.replaceChildren(...this._areas.map((a) => h("button", {
+      class: "chip", type: "button", "aria-pressed": this._sel.includes(a.area_id) ? "true" : "false",
+      onclick: () => this._toggleArea(a.area_id),
+    }, a.name || a.area_id)));
     this._elChips.hidden = this._areas.length === 0;
-    const sel = this._elChips.querySelector('[aria-selected="true"]');
-    sel?.scrollIntoView?.({ block: "nearest", inline: "center" });
+    if (this._userPicked) this._elChips.scrollLeft = scroll;
+    else this._elChips.querySelector('[aria-pressed="true"]')?.scrollIntoView?.({ block: "nearest", inline: "center" });
 
     this._updateGear();
     this._renderMessages();
@@ -651,10 +675,15 @@ class LightCompanionCard extends HTMLElement {
     if (!desktop && this._modalEl) this._closeSettings();
   }
 
+  _placeholder() {
+    const t = makeT(this._hass);
+    if (this._voice) return t("listening");
+    return this._sel.length ? t("placeholder") : t("placeholderAuto");
+  }
+
   _updateComposer() {
-    const busy = this._pending.has(this._area);
-    this._elSend.disabled = busy || !this._area;
-    this._elInput.disabled = !this._area;
+    this._elSend.disabled = this._busy || !this._areas.length;
+    this._elInput.disabled = !this._areas.length;
   }
 
   /* ---- colors ---- */
@@ -662,9 +691,9 @@ class LightCompanionCard extends HTMLElement {
   _updateColors() {
     if (!this._built) return;
     const t = makeT(this._hass);
-    const lights = this._areaLights();
+    const lights = this._selLights();
     const data = lights.map((l) => ({ info: l, ...lightColor(this._hass?.states?.[l.entity_id]) }));
-    const sig = this._area + "|" + data.map((d) => `${d.on}${d.rgb}${d.weight.toFixed(2)}`).join(";");
+    const sig = this._sel.join(",") + "|" + data.map((d) => `${d.on}${d.rgb}${d.weight.toFixed(2)}`).join(";");
     if (sig === this._lastSig) return;
     this._lastSig = sig;
     const avg = averageColor(data);
@@ -695,9 +724,10 @@ class LightCompanionCard extends HTMLElement {
   _renderStatus() {
     if (!this._built) return;
     const t = makeT(this._hass);
-    const eng = this._status.engine?.[this._area];
+    const running = this._activeAreas();
+    const eng = this._status.engine?.[running[0]];
     const planner = this._status.planner || {};
-    const follow = planner.follow?.[this._area];
+    const follow = planner.follow?.[running[0]] || this._sel.map((a) => planner.follow?.[a]).find(Boolean);
     const ai = planner.ai;
     const items = [];
     const active = !!eng?.active;
@@ -706,6 +736,7 @@ class LightCompanionCard extends HTMLElement {
     if (active) {
       const pat = t(`p.${eng.pattern}`) !== `p.${eng.pattern}` ? t(`p.${eng.pattern}`) : eng.pattern || "";
       let label = `${t("running")}: ${pat}`;
+      if (this._sel.length > 1) label = `${running.map((a) => this._areaName(a)).join(", ")} · ${label}`;
       if (eng.source === "music") {
         const title = follow?.title ?? follow?.track?.title;
         label += ` · ${t("sourceMusic")}${title ? ` — ${title}` : ""}`;
@@ -727,21 +758,17 @@ class LightCompanionCard extends HTMLElement {
   }
 
   async _stop() {
-    if (!this._area) return;
-    try { await this._hass.callWS({ type: "lightcompanion/stop", area_id: this._area }); }
-    catch (err) { this._push(this._area, "bot", this._errText(errorCode(err)), true); }
+    for (const area of this._activeAreas()) {
+      try { await this._hass.callWS({ type: "lightcompanion/stop", area_id: area }); }
+      catch (err) { this._push("bot", this._errText(errorCode(err)), true); }
+    }
   }
 
   /* ---- chat ---- */
 
-  _thread(area) {
-    if (!this._threads.has(area)) this._threads.set(area, []);
-    return this._threads.get(area);
-  }
-
-  _push(area, role, text, isErr = false) {
-    this._thread(area).push({ role, text, err: isErr });
-    if (area === this._area) this._renderMessages();
+  _push(role, text, isErr = false, tag = "") {
+    this._thread.push({ role, text, err: isErr, tag });
+    this._renderMessages();
   }
 
   _errText(code) {
@@ -759,17 +786,19 @@ class LightCompanionCard extends HTMLElement {
     } else if (this._areasLoaded && !this._areas.length) {
       nodes.push(h("div", { class: "notice", text: t("noAreas") }));
     }
-    const thread = this._area ? this._thread(this._area) : [];
-    if (!thread.length && this._area && !this._pending.has(this._area)) {
+    const thread = this._thread;
+    if (!thread.length && this._areas.length && !this._busy) {
       nodes.push(h("div", { class: "empty" },
         h("div", { text: t("emptyHint") }),
+        this._areas.length > 1 ? h("div", { class: "help", text: t("roomsHint") }) : null,
         h("div", { class: "sugs" }, (STRINGS[makeLang(this._hass)].suggestions || []).map((s) =>
           h("button", { class: "sug", type: "button", onclick: () => this._send(s) }, s)))));
     }
     for (const m of thread) {
-      nodes.push(h("div", { class: `bubble ${m.role === "user" ? "user" : "bot"}${m.err ? " err" : ""}`, text: m.text }));
+      nodes.push(h("div", { class: `bubble ${m.role === "user" ? "user" : "bot"}${m.err ? " err" : ""}` },
+        m.text, m.tag ? h("span", { class: "tag", text: m.tag }) : null));
     }
-    if (this._pending.has(this._area)) {
+    if (this._busy) {
       nodes.push(h("div", { class: "bubble bot typing", role: "status", "aria-label": t("thinking") }, h("span"), h("span"), h("span")));
     }
     this._elMsgs.replaceChildren(...nodes);
@@ -779,25 +808,30 @@ class LightCompanionCard extends HTMLElement {
 
   async _send(text) {
     text = String(text || "").trim();
-    const area = this._area;
-    if (!text || !area || this._pending.has(area)) return;
+    if (!text || !this._areas.length || this._busy) return;
+    const sent = [...this._sel];
     this._elInput.value = "";
-    this._push(area, "user", text);
-    this._pending.add(area);
+    this._push("user", text, false, sent.length > 1 ? sent.map((a) => this._areaName(a)).join(", ") : "");
+    this._busy = true;
     this._renderMessages();
     const lang = this._hass?.locale?.language || this._hass?.language;
     try {
-      const res = await this._hass.callWS({ type: "lightcompanion/chat", area_id: area, text, language: lang || undefined });
-      this._pending.delete(area);
+      const res = await this._hass.callWS({ type: "lightcompanion/chat", area_ids: sent, text, language: lang || undefined });
+      this._busy = false;
       if (res?.error) {
         const friendly = this._errText(res.error);
-        this._push(area, "bot", res.reply ? `${res.reply}\n\n${friendly}` : friendly, true);
+        this._push("bot", res.reply ? `${res.reply}\n\n${friendly}` : friendly, true);
       } else {
-        this._push(area, "bot", res?.reply || "…");
+        // The AI may have picked other rooms than the tapped ones: show and adopt them.
+        const applied = (res?.areas || []).filter((a) => this._areas.some((x) => x.area_id === a));
+        const moved = applied.length > 0 && (applied.length !== sent.length || applied.some((a) => !sent.includes(a)));
+        if (moved) { this._userPicked = true; this._sel = applied; }
+        this._push("bot", res?.reply || "…", false, moved || applied.length > 1 ? `→ ${applied.map((a) => this._areaName(a)).join(", ")}` : "");
+        if (moved) this._renderAll();
       }
     } catch (err) {
-      this._pending.delete(area);
-      this._push(area, "bot", this._errText(errorCode(err)), true);
+      this._busy = false;
+      this._push("bot", this._errText(errorCode(err)), true);
     }
     this._renderMessages();
   }
@@ -814,7 +848,7 @@ class LightCompanionCard extends HTMLElement {
     this._elMic.classList.toggle("rec", on);
     this._elMic.setAttribute("aria-label", on ? t("micStop") : t("mic"));
     this._elMic.dataset.tip = on ? t("micStop") : t("mic");
-    this._elInput.placeholder = on ? t("listening") : t("placeholder");
+    this._elInput.placeholder = on ? t("listening") : this._placeholder();
   }
 
   async _startVoice() {
@@ -830,7 +864,7 @@ class LightCompanionCard extends HTMLElement {
         this._setListening(false);
       }
     }
-    if (!this._startSpeech()) this._push(this._area, "bot", t("noSpeech"), true);
+    if (!this._startSpeech()) this._push("bot", t("noSpeech"), true);
   }
 
   async _startAssist() {
@@ -873,7 +907,7 @@ class LightCompanionCard extends HTMLElement {
     };
     const fail = (fallback) => {
       finish();
-      if (fallback && !gotText && !this._startSpeech()) this._push(this._area, "bot", makeT(this._hass)("noSpeech"), true);
+      if (fallback && !gotText && !this._startSpeech()) this._push("bot", makeT(this._hass)("noSpeech"), true);
     };
 
     this._voice = { stop: (silent) => { endAudio(); if (silent) finish(); } };
@@ -904,7 +938,6 @@ class LightCompanionCard extends HTMLElement {
     }
 
     safety = setTimeout(() => endAudio(), 20000);
-    const area = this._area;
     try {
       unsub = await conn.subscribeMessage((ev) => {
         const d = ev?.data || {};
@@ -932,7 +965,7 @@ class LightCompanionCard extends HTMLElement {
           case "error":
             endAudio();
             if (d.code === "stt-no-text-recognized") {
-              this._push(area, "bot", makeT(this._hass)("noCatch"), true);
+              this._push("bot", makeT(this._hass)("noCatch"), true);
               finish();
             } else fail(true);
             break;
@@ -991,7 +1024,7 @@ class LightCompanionCard extends HTMLElement {
     this._onKey = (e) => {
       if (e.key === "Escape") { e.stopPropagation(); this._closeSettings(); return; }
       if (e.key !== "Tab") return;
-      const f = [...dialog.querySelectorAll("button, input, select, [tabindex]:not([tabindex='-1'])")].filter((n) => !n.disabled && n.offsetParent !== null);
+      const f = [...dialog.querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])")].filter((n) => !n.disabled && n.offsetParent !== null);
       if (!f.length) return;
       const act = this.shadowRoot.activeElement;
       if (e.shiftKey && (act === f[0] || act === dialog)) { e.preventDefault(); f[f.length - 1].focus(); }
@@ -1093,6 +1126,17 @@ class LightCompanionCard extends HTMLElement {
     f.keywords.addEventListener("input", refreshKw);
     refreshKw();
 
+    const special = s.special_lights || {};
+    f.special = [];
+    const specialRows = candidates.flatMap((c) => {
+      const on = Object.prototype.hasOwnProperty.call(special, c.entity_id);
+      const note = h("textarea", { maxlength: 600, placeholder: t("sSpecialNote"), "aria-label": `${c.name || c.entity_id}: ${t("sSpecialNote")}`, disabled: ro, hidden: !on });
+      note.value = special[c.entity_id] || "";
+      const box = h("input", { type: "checkbox", checked: on, disabled: ro, onchange: () => { note.hidden = !box.checked; if (box.checked) note.focus(); } });
+      f.special.push({ id: c.entity_id, box, note });
+      return [h("label", { class: "check" }, box, h("span", {}, c.name || c.entity_id, " ", h("small", { text: c.area ? `· ${c.area}` : "" }))), note];
+    });
+
     const providerFields = h("div", { class: "field-group", style: "display:flex;flex-direction:column;gap:14px" });
     const fModel = field(t("sModel"), f.model);
     const fKey = field(t("sApiKey"), f.key, t("sApiKeyHelp"));
@@ -1120,6 +1164,7 @@ class LightCompanionCard extends HTMLElement {
       h("div", { class: "field" }, checkRow(f.strobe, t("sStrobe")), h("div", { class: "warn", text: t("sStrobeWarn") })),
       h("div", { class: "field" }, h("span", { class: "lbl", text: t("sExcluded") }), h("div", { class: "list" }, lightRows), h("div", { class: "help", text: t("sExcludedHelp") })),
       field(t("sKeywords"), f.keywords, t("sKeywordsHelp")),
+      h("div", { class: "field" }, h("span", { class: "lbl", text: t("sSpecial") }), h("div", { class: "list" }, specialRows), h("div", { class: "help", text: t("sSpecialHelp") })),
       h("div", { class: "field" }, h("span", { class: "lbl", text: t("sPlayers") }), playerRows),
       field(t("sDefaultArea"), f.defArea),
       h("div", { class: "field" }, checkRow(f.panel, t("sPanel"))),
@@ -1140,13 +1185,16 @@ class LightCompanionCard extends HTMLElement {
         show_panel: f.panel.checked,
         excluded_lights: f.lightBoxes.filter((lb) => lb.box.checked && !lb.hit).map((lb) => lb.id),
         player_overrides: Object.fromEntries(Object.entries(f.players).filter(([, el]) => el.value).map(([k, el]) => [k, el.value])),
+        special_lights: Object.fromEntries(f.special.filter((x) => x.box.checked).map((x) => [x.id, x.note.value.trim()])),
       };
+      const sortedObj = (o) => JSON.stringify(Object.entries(o || {}).sort(([a], [b]) => a.localeCompare(b)));
       const norm = (v) => JSON.stringify(Array.isArray(v) ? [...v].sort() : v ?? null);
       const changed = {};
       for (const [k, v] of Object.entries(next)) {
         let before = s[k];
         if (k === "player_overrides") before = s[k] || {};
         if (k === "model" || k === "ai_task_entity" || k === "conversation_agent" || k === "default_area") before = s[k] || null;
+        if (k === "special_lights") { if (sortedObj(v) !== sortedObj(before)) changed[k] = v; continue; }
         if (k === "player_overrides" ? JSON.stringify(v) !== JSON.stringify(before) : norm(v) !== norm(before)) changed[k] = v;
       }
       if (f.key.value) changed.api_key = f.key.value;
@@ -1156,7 +1204,7 @@ class LightCompanionCard extends HTMLElement {
         await this._hass.callWS({ type: "lightcompanion/settings/set", options: changed });
         f.key.value = "";
         this._closeSettings();
-        this._push(this._area, "bot", t("sSaved"));
+        this._push("bot", t("sSaved"));
         setTimeout(() => { if (this._connected) this._init(); }, 3000);
       } catch (e) {
         save.disabled = false; save.textContent = t("sSave");

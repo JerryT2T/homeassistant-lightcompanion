@@ -90,7 +90,7 @@
   },
   "entity": {
     "switch": {
-      "effect": { "name": "{area} effect" }
+      "effect": { "name": "Effect" }
     }
   }
 }

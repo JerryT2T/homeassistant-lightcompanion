@@ -121,6 +121,8 @@ class FakeLight:
     max_kelvin: int | None = 6500
     is_group: bool = False
     excluded: bool = False
+    special: bool = False
+    note: str = ""
 
 
 def make_settings(**kw: Any) -> SimpleNamespace:
